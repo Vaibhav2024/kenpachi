@@ -2,16 +2,62 @@
   "name": "kenpachi-sdk",
   "version": "0.1.0",
   "description": "A production-shaped agent SDK: typed tools, time-travel context, self-healing tool calls, saga rollback, and dynamic tool synthesis.",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
   },
-  "keywords": ["agent", "llm", "sdk", "anthropic", "openai", "tools", "ai-agent"],
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src tests examples --ext .ts",
+    "example:1": "tsx examples/1-basic-agent.ts",
+    "example:2": "tsx examples/2-time-travel.ts",
+    "example:3": "tsx examples/3-self-healing.ts",
+    "example:5": "tsx examples/5-memory.ts",
+    "example:6": "tsx examples/6-rollback.ts",
+    "prepublishOnly": "npm run typecheck && npm run test && npm run build"
+  },
+  "keywords": [
+    "agent",
+    "llm",
+    "sdk",
+    "anthropic",
+    "openai",
+    "tools",
+    "ai-agent"
+  ],
   "author": "Vaibhav Patil",
   "license": "MIT",
   "type": "module",
   "repository": {
     "type": "git",
     "url": "https://github.com/Vaibhav2024/kenpachi-sdk.git"
+  },
+  "dependencies": {
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.2",
+    "@typescript-eslint/eslint-plugin": "^8.65.0",
+    "@typescript-eslint/parser": "^8.65.0",
+    "eslint": "^10.8.0",
+    "tsup": "^8.5.1",
+    "tsx": "^4.23.1",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10"
   }
 }
