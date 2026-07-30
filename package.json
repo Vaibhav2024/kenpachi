@@ -1,0 +1,17 @@
+{
+  "name": "kenpachi-sdk",
+  "version": "0.1.0",
+  "description": "A production-shaped agent SDK: typed tools, time-travel context, self-healing tool calls, saga rollback, and dynamic tool synthesis.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": ["agent", "llm", "sdk", "anthropic", "openai", "tools", "ai-agent"],
+  "author": "Vaibhav Patil",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Vaibhav2024/kenpachi-sdk.git"
+  }
+}
