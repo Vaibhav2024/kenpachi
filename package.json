@@ -1,13 +1,16 @@
 {
   "name": "kenpachi-sdk",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A production-shaped agent SDK: typed tools, time-travel context, self-healing tool calls, saga rollback, and dynamic tool synthesis.",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
+      "types": {
+        "import": "./dist/index.d.ts",
+        "require": "./dist/index.d.cts"
+      },
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
     }
@@ -48,7 +51,7 @@
     "url": "https://github.com/Vaibhav2024/kenpachi-sdk.git"
   },
   "dependencies": {
-    "zod": "^4.4.3"
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/node": "^26.1.2",
