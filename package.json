@@ -48,7 +48,7 @@
   "type": "module",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Vaibhav2024/kenpachi-sdk.git"
+    "url": "https://github.com/Vaibhav2024/kenpachi.git"
   },
   "dependencies": {
     "zod": "^3.23.8"
