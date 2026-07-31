@@ -19,13 +19,13 @@ dependency) with a few things most minimal agent loops skip:
 
 ## Install
 
-\`\`\`bash
+```bash
 npm install kenpachi-sdk
-\`\`\`
+
 
 ## Quick start
 
-\`\`\`typescript
+```typescript
 import { z } from "zod";
 import { Agent, defineTool, createAnthropicProvider } from "kenpachi-sdk";
 
@@ -43,22 +43,22 @@ const agent = new Agent(provider, [getWeather]);
 
 const result = await agent.run("What's the weather in Nashik?");
 console.log(result.content);
-\`\`\`
+```
 
 ## Time-travel
 
-\`\`\`typescript
+```typescript
 await agent.run("first message");
 const snap = agent.context.listSnapshots().at(-1)!;
 
 // Branch back to that point and try a different follow-up, without
 // re-running the first exchange against the model.
 const branched = agent.context.branchAt(snap.turnIndex);
-\`\`\`
+```
 
 ## Dynamic tools with a connector registry
 
-\`\`\`typescript
+```typescript
 import { ConnectorRegistry, synthesizeTool } from "kenpachi-sdk";
 
 const registry = new ConnectorRegistry();
@@ -78,7 +78,7 @@ const tool = synthesizeTool(
   },
   registry
 );
-\`\`\`
+```
 
 ## Security notes
 
@@ -93,12 +93,12 @@ const tool = synthesizeTool(
 
 ## Development
 
-\`\`\`bash
+```bash
 npm install
 npm run typecheck
 npm run test
 npm run build
-\`\`\`
+```
 
 ## License
 
