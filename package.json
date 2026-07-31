@@ -23,7 +23,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "eslint src tests examples --ext .ts",
+    "lint": "eslint src tests examples",
     "example:1": "tsx examples/1-basic-agent.ts",
     "example:2": "tsx examples/2-time-travel.ts",
     "example:3": "tsx examples/3-self-healing.ts",
@@ -57,7 +57,7 @@
     "eslint": "^10.8.0",
     "tsup": "^8.5.1",
     "tsx": "^4.23.1",
-    "typescript": "^7.0.2",
+    "typescript": "^5.9.3",
     "vitest": "^4.1.10"
   }
 }
