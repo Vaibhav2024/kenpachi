@@ -1,6 +1,6 @@
 {
-  "name": "kenpachi-sdk",
-  "version": "0.1.1",
+  "name": "kenpachi",
+  "version": "0.1.2",
   "description": "A production-shaped agent SDK: typed tools, time-travel context, self-healing tool calls, saga rollback, and dynamic tool synthesis.",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
