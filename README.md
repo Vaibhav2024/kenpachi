@@ -1,6 +1,6 @@
 # kenpachi
 
-![Logo](public/tool_calling.png)
+![Logo](public/logo.png)
 
 A small, typed agent SDK for building tool-using LLM agents in TypeScript —
 built from scratch on top of raw provider `fetch` calls (no vendor SDK
