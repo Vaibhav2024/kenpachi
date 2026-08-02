@@ -1,0 +1,68 @@
+---
+title: "Providers"
+description: "Anthropic and OpenAI adapters — zero vendor SDK dependencies."
+---
+
+kenpachi talks to LLMs over raw `fetch`. Both built-in providers support **streaming** (`streamTurn`) automatically — no extra config for `agent.stream()` or `onText`.
+
+---
+
+## Anthropic Provider
+
+```typescript
+import { createAnthropicProvider } from "kenpachi";
+
+const provider = createAnthropicProvider({
+  apiKey: process.env.ANTHROPIC_API_KEY!,
+  model: "claude-sonnet-4-6", // Optional
+});
+```
+
+### Options
+
+<ParamField path="apiKey" type="string" required>
+  Anthropic API key string.
+</ParamField>
+
+<ParamField path="model" type="string" default="claude-sonnet-4-6">
+  Model name override string.
+</ParamField>
+
+---
+
+## OpenAI Provider
+
+```typescript
+import { createOpenAIProvider } from "kenpachi";
+
+const provider = createOpenAIProvider({
+  apiKey: process.env.OPENAI_API_KEY!,
+  model: "gpt-4o", // Optional
+});
+```
+
+### Options
+
+<ParamField path="apiKey" type="string" required>
+  OpenAI API key string.
+</ParamField>
+
+<ParamField path="model" type="string" default="gpt-4o">
+  Model name override string.
+</ParamField>
+
+---
+
+## Custom providers
+
+Implement the `ModelProvider` interface to plug in any backend:
+
+```typescript
+interface ModelProvider {
+  name: string;
+  createTurn(input: ModelTurnInput): Promise<ModelTurnResult>;
+  streamTurn?(input: ModelTurnInput): AsyncIterable<StreamChunk>; // optional — enables token streaming
+}
+```
+
+If you only implement `createTurn`, streaming still works — text is emitted as a single chunk.

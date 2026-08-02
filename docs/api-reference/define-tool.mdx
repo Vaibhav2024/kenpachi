@@ -1,0 +1,54 @@
+---
+title: "defineTool"
+description: "API reference for defining typed, validated tools."
+---
+
+`defineTool` creates a validated, type-safe tool definition usable by `Agent`.
+
+```typescript
+import { defineTool } from "kenpachi";
+```
+
+---
+
+## Parameters
+
+<ParamField path="definition" type="ToolDefinition" required>
+  Configuration object describing tool behavior:
+
+  <Expandable title="ToolDefinition Properties">
+    <ResponseField name="name" type="string" required>
+      The tool name passed to the model (must contain alphanumeric characters or underscores).
+    </ResponseField>
+
+    <ResponseField name="description" type="string" required>
+      Clear description telling the LLM when and how to use the tool.
+    </ResponseField>
+
+    <ResponseField name="schema" type="z.ZodType<Args>" required>
+      Zod schema defining expected parameters.
+    </ResponseField>
+
+    <ResponseField name="execute" type="(args: Args, ctx: ToolContext) => Promise<Result>" required>
+      Async function executing tool logic with validated arguments.
+    </ResponseField>
+
+    <ResponseField name="repairable" type="boolean" default="true">
+      Whether `kenpachi` should attempt automatic argument coercion and repair on schema failures.
+    </ResponseField>
+  </Expandable>
+</ParamField>
+
+---
+
+## ToolContext Parameter
+
+The `execute` function receives a `ToolContext` instance as its second argument:
+
+<ResponseField name="metadata" type="Record<string, unknown>">
+  KeyValue store for run metadata (e.g., user session details).
+</ResponseField>
+
+<ResponseField name="registerCompensation" type="(undo: () => Promise<void>) => void">
+  Function used to register a compensating action executed if a later tool call in the same batch fails.
+</ResponseField>

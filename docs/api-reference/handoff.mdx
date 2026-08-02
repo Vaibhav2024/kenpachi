@@ -1,0 +1,123 @@
+---
+title: "handoff"
+description: "API reference for multi-agent delegation via handoff tools."
+---
+
+Handoffs wrap a specialist `Agent` as a `Tool` the parent can call. Two entry points:
+
+- **`handoff()`** — recommended shorthand
+- **`createHandoff()`** — full options object
+
+```typescript
+import { handoff, createHandoff } from "kenpachi";
+```
+
+---
+
+## `handoff(agent, description, options?)`
+
+Shorthand for the most common case.
+
+```typescript
+const billingHandoff = handoff(billingAgent, "Use for billing or payment questions", {
+  id: "billing",
+});
+// Tool name: handoff_billing
+```
+
+### Parameters
+
+<ParamField path="agent" type="Agent" required>
+  The specialist agent to delegate to.
+</ParamField>
+
+<ParamField path="description" type="string" required>
+  Shown to the parent model — explain when to use this specialist.
+</ParamField>
+
+<ParamField path="options" type="HandoffOptions">
+  Optional configuration (see below).
+</ParamField>
+
+---
+
+## `createHandoff(options)`
+
+Full form when you need an explicit tool name or all options in one object.
+
+```typescript
+const billingHandoff = createHandoff({
+  name: "handoff_to_billing",
+  description: "Use for billing or payment questions",
+  agent: billingAgent,
+  context: "full",
+});
+```
+
+---
+
+## HandoffOptions
+
+<ParamField path="id" type="string">
+  Short identifier used to build the tool name (`handoff_<id>`). Provide `id` or `name`, not both required.
+</ParamField>
+
+<ParamField path="name" type="string">
+  Explicit tool name. Overrides auto-generated `handoff_<id>`.
+</ParamField>
+
+<ParamField path="description" type="string" required>
+  When the parent model should call this handoff.
+</ParamField>
+
+<ParamField path="agent" type="Agent" required>
+  Specialist agent instance.
+</ParamField>
+
+<ParamField path="context" type={'"full" | "summary" | "none"'} default="full">
+  How much parent conversation history to pass to the sub-agent.
+</ParamField>
+
+<ParamField path="onEvent" type="(event: AgentEvent) => void">
+  Callback for events inside the sub-agent run.
+</ParamField>
+
+<ParamField path="maxTurns" type="number">
+  Max turns for the sub-agent run (forwarded to `subAgent.run()`).
+</ParamField>
+
+---
+
+## Tool schema
+
+Every handoff exposes a single argument to the parent model:
+
+```typescript
+{ task: string } // "The specific task or question to hand off"
+```
+
+The parent model fills `task` when it decides to delegate.
+
+---
+
+## Return value
+
+The handoff tool's `execute` returns a **plain text string** — the sub-agent's final `result.text`. It is not wrapped in an object.
+
+```typescript
+// Reading the result via onEvent on the parent:
+await triageAgent.run("What's my balance?", {
+  onEvent: (e) => {
+    if (e.type === "tool_result" && e.name === "handoff_billing") {
+      console.log(e.result); // "Your balance is $42."
+    }
+  },
+});
+```
+
+---
+
+## Related
+
+- [`Agent.spawn()`](/api-reference/agent#spawnseedmessages) — used internally; also available for custom sub-agent flows
+- [Handoffs concept guide](/concepts/handoffs) — patterns and examples

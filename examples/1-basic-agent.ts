@@ -23,7 +23,7 @@ async function main() {
         onEvent: (e) => console.log("[event]", e.type),
     });
 
-    console.log("Final:", result.content);
+    console.log("Final:", result.text);
 }
 
 main();

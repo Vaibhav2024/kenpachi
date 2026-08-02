@@ -1,0 +1,64 @@
+---
+title: "Connectors"
+description: "API reference for ConnectorRegistry and dynamic tool synthesis."
+---
+
+Modules for managing dynamic runtime tools and secret isolation.
+
+---
+
+## ConnectorRegistry
+
+Class used to store endpoint connection configurations and auth key references.
+
+```typescript
+import { ConnectorRegistry } from "kenpachi";
+
+const registry = new ConnectorRegistry();
+```
+
+### Methods
+
+#### `register(name, connector)`
+
+Registers a named API endpoint configuration.
+
+<ParamField path="name" type="string" required>
+  Unique alias for the connector.
+</ParamField>
+
+<ParamField path="connector" type="Connector" required>
+  <Expandable title="Connector Properties">
+    <ResponseField name="baseUrl" type="string" required>
+      Root URL for the external endpoint.
+    </ResponseField>
+    <ResponseField name="authEnvVar" type="string">
+      Environment variable name holding the API key or token.
+    </ResponseField>
+    <ResponseField name="description" type="string" required>
+      Human-readable description of what this connector exposes.
+    </ResponseField>
+  </Expandable>
+</ParamField>
+
+---
+
+## synthesizeTool(spec, registry)
+
+Converts a tool specification into an executable `Tool` instance sandboxed via Node's `vm` module.
+
+```typescript
+import { synthesizeTool } from "kenpachi";
+
+const tool = synthesizeTool(spec, registry);
+```
+
+### Parameters
+
+<ParamField path="spec" type="SynthesizedToolSpec" required>
+  Spec object defining tool parameters and JavaScript function body.
+</ParamField>
+
+<ParamField path="registry" type="ConnectorRegistry" required>
+  Active registry instance providing connector metadata.
+</ParamField>

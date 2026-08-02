@@ -1,0 +1,132 @@
+---
+title: "Sandboxed Tool Runtime"
+description: "Allow AI agents to generate and execute temporary, sandboxed helper tools safely at runtime."
+---
+
+When building autonomous agents, pre-defining every tool ahead of time is impossible. Users will inevitably ask your agent to perform specialized calculations, data formatting, or custom logic that you didn't code in advance.
+
+**Sandboxed Tool Runtime** enables `kenpachi` agents to author small, custom JavaScript functions **on the fly** while running.
+
+To protect your system, generated code executes in an isolated V8 sandbox (`node:vm`) with **zero direct network access** and **no exposure to secret API keys**.
+
+<Note>
+**When should you use this?** Use sandboxed tool execution when your agent needs to perform custom math, parse strings, or run logic tailored to a user request without cluttering your codebase with static tools.
+</Note>
+
+---
+
+## How It Works (The Safe vs. The Sandbox)
+
+To keep your backend secure, `kenpachi` strictly separates **API Credentials** from **Model Logic**:
+
+1. **The Connector (Your Safe):** Lives on your backend server. It securely maps an endpoint alias (like `"store_api"`) to host environment variables (`process.env.STORE_API_KEY`).
+2. **The V8 Sandbox (The Isolated Room):** The AI model writes pure algorithmic JavaScript. The sandbox prevents the code from accessing your host filesystem, running `require()`, or making unauthorized internet requests.
+3. **The `callConnector` Bridge:** When the sandboxed code needs external data, it calls `callConnector("/path")`. `kenpachi` handles the request on the host server, injects the secret key, and returns the result—**the LLM never sees or touches your private API key**.
+
+---
+
+## Real-World Example: End-to-End Shopping Assistant
+
+Imagine a shopping assistant where a user asks for a price calculation in Euros. The agent attaches the sandboxed tool and evaluates the response using an LLM.
+
+### Step 1: Register the API Endpoint (Server-Side)
+
+Register your store API endpoint in your server initialization code:
+
+```typescript title="server.ts"
+import { ConnectorRegistry } from "kenpachi";
+
+export const registry = new ConnectorRegistry();
+
+// Register the store API connector on the host
+registry.register("store_api", {
+  baseUrl: "https://api.yourstore.com/v1",
+  authEnvVar: "STORE_API_SECRET_KEY", // Read from host environment variables
+  description: "Internal e-commerce store catalog and pricing API",
+});
+```
+
+### Step 2: Pass the Tool to an Agent and Run
+
+Instead of manually executing tools, pass the synthesized tool to `new Agent()` and let `agent.run()` trigger the LLM call and sandboxed execution automatically:
+
+```typescript title="app.ts"
+import { Agent, createOpenAIProvider, synthesizeTool } from "kenpachi";
+import { registry } from "./server.js";
+
+// 1. Synthesize the tool specification and sandbox logic
+const pricingTool = synthesizeTool(
+  {
+    name: "calculate_discounted_checkout",
+    description: "Fetches product base price, applies a 15% VIP discount, and converts to EUR",
+    parameters: {
+      productId: "string",
+      eurExchangeRate: "number",
+    },
+    // Pure logic body executed safely inside the V8 sandbox
+    jsBody: `
+      // callConnector appends the base URL and injects the API key automatically
+      const product = await callConnector("/products/" + args.productId);
+      
+      // Perform custom business calculations
+      const discountedUSD = product.price * 0.85; // 15% discount
+      const finalEUR = discountedUSD * args.eurExchangeRate;
+
+      return {
+        productName: product.name,
+        originalPriceUSD: product.price,
+        finalPriceEUR: Number(finalEUR.toFixed(2))
+      };
+    `,
+    connector: "store_api", // References the registered server connector
+  },
+  registry
+);
+
+// 2. Attach the tool to a kenpachi Agent
+const provider = createOpenAIProvider({ apiKey: process.env.OPENAI_API_KEY! });
+const agent = new Agent(provider, [pricingTool]);
+
+// 3. Run the Agent (This triggers the LLM call)
+async function main() {
+  const response = await agent.run(
+    "How much will product prod_99182 cost in EUR assuming an exchange rate of 0.92?"
+  );
+
+  console.log(response.text);
+  // Output: "Product prod_99182 (Wireless Headphones) will cost 78.20 EUR with your VIP discount."
+}
+
+main();
+```
+
+---
+
+## What Happens During `agent.run()`?
+
+When you execute `agent.run(...)`:
+
+1. **LLM Decision:** The model analyzes the user query, recognizes `calculate_discounted_checkout`, and extracts `{ productId: "prod_99182", eurExchangeRate: 0.92 }`.
+2. **Sandbox Execution:** `kenpachi` spins up an isolated V8 container (`node:vm`) and executes the `jsBody` code.
+3. **Connector Bridge:** `callConnector("/products/prod_99182")` is intercepted by `kenpachi`. The server fetches the data from `https://api.yourstore.com/v1/products/prod_99182` with the `STORE_API_SECRET_KEY` attached.
+4. **Final Response:** The computed result (`78.20 EUR`) is passed back to the LLM to format the final user-facing response.
+
+---
+
+## What `callConnector` Handles Automatically
+
+Inside the `jsBody` code block:
+- **No full URLs:** Write clean relative paths like `/products/...` instead of `https://api.yourstore.com/v1/products/...`.
+- **No header management:** Authorization tokens and secret keys are injected on the server side automatically.
+- **No network leaks:** The sandbox cannot make unapproved `fetch()` requests to outside domains.
+
+---
+
+## Comparison
+
+| Feature | Standard Static Tools | Sandboxed Tool Runtime (`kenpachi`) |
+| :--- | :--- | :--- |
+| **Adaptability** | Pre-coded ahead of time | Synthesizes custom logic on demand |
+| **Secret Management** | Handled inside tool logic | Isolated safely in host environment variables |
+| **Network Boundaries** | Unrestricted process access | Restricted exclusively to approved connectors |
+| **Execution Environment** | Main Application Process | Isolated V8 Sandbox (`node:vm`) |

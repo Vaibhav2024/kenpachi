@@ -7,6 +7,12 @@ export interface ToolContext {
     metadata: Record<string, unknown>
     /** Register an undo action for saga rollback (see runner.ts). */
     registerCompensation: (undo: () => Promise<void>) => void
+    /**
+     * The calling Agent's context, for tools that need to read (never mutate)
+     * the parent conversation — used by handoff.ts for context preservation.
+     * Populated by runner.ts; undefined if a tool is invoked outside an Agent.
+     */
+    parentContext?: import("./context.js").AgentContext
 }
 
 export interface Tool<Args = any, Result = any> {

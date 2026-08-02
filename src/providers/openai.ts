@@ -1,4 +1,5 @@
-import type { Message, ModelProvider, ModelTurnResult } from "../types.js";
+import type { Message, ModelProvider, ModelTurnResult, StreamChunk } from "../types.js";
+import { parseSSE } from "./sse.js";
 
 export function createOpenAIProvider(opts: { apiKey: string; model?: string }): ModelProvider {
     const model = opts.model ?? "gpt-4o-mini";
@@ -47,6 +48,95 @@ export function createOpenAIProvider(opts: { apiKey: string; model?: string }): 
 
             const data = await res.json();
             return fromOpenAIResponse(data);
+        },
+
+        async *streamTurn({ system, messages, tools }): AsyncGenerator<StreamChunk, void, unknown> {
+            const chatMessages = [
+                ...(system ? [{ role: "system", content: system }] : []),
+                ...messages.flatMap(toOpenAIMessages),
+            ];
+
+            const bodyPayload: Record<string, unknown> = {
+                model,
+                messages: chatMessages,
+                stream: true,
+            };
+
+            const formattedTools = tools.map((t) => ({
+                type: "function" as const,
+                function: { name: t.name, description: t.description, parameters: t.parameters },
+            }));
+
+            if (formattedTools.length > 0) {
+                bodyPayload.tools = formattedTools;
+            }
+
+            const res = await fetch("https://api.openai.com/v1/chat/completions", {
+                method: "POST",
+                headers: { "content-type": "application/json", authorization: `Bearer ${opts.apiKey}` },
+                body: JSON.stringify(bodyPayload),
+            });
+
+            if (!res.ok) {
+                const text = await res.text();
+                throw new Error(`OpenAI API error ${res.status}: ${text}`);
+            }
+
+            let textAcc = "";
+            const toolCalls: Record<number, { id: string; name: string; argsJson: string }> = {};
+            let finishReason = "stop";
+            let inputTokens = 0;
+            let outputTokens = 0;
+
+            for await (const evt of parseSSE(res)) {
+                if (evt.data === "[DONE]") continue;
+                const payload = JSON.parse(evt.data);
+                const choice = payload.choices?.[0];
+                const delta = choice?.delta;
+
+                if (payload.usage) {
+                    inputTokens = payload.usage.prompt_tokens ?? inputTokens;
+                    outputTokens = payload.usage.completion_tokens ?? outputTokens;
+                }
+
+                if (delta?.content) {
+                    textAcc += delta.content;
+                    yield { type: "text_delta", text: delta.content };
+                }
+
+                if (delta?.tool_calls) {
+                    for (const tc of delta.tool_calls) {
+                        const i = tc.index;
+                        if (!toolCalls[i]) {
+                            toolCalls[i] = { id: tc.id ?? `call_${i}`, name: tc.function?.name ?? "", argsJson: "" };
+                            if (tc.function?.name) {
+                                yield { type: "tool_call_start", id: toolCalls[i].id, name: toolCalls[i].name };
+                            }
+                        }
+                        if (tc.function?.arguments) {
+                            toolCalls[i].argsJson += tc.function.arguments;
+                            yield { type: "tool_call_args_delta", id: toolCalls[i].id, jsonDelta: tc.function.arguments };
+                        }
+                    }
+                }
+
+                if (choice?.finish_reason) finishReason = choice.finish_reason;
+            }
+
+            const content: Message["content"] = [];
+            if (textAcc) content.push({ type: "text", text: textAcc });
+            for (const tc of Object.values(toolCalls)) {
+                content.push({ type: "tool_call", id: tc.id, name: tc.name, arguments: JSON.parse(tc.argsJson || "{}") });
+            }
+
+            yield {
+                type: "turn_complete",
+                result: {
+                    message: { role: "assistant", content },
+                    stopReason: finishReason === "tool_calls" ? "tool_use" : "end_turn",
+                    usage: { inputTokens, outputTokens },
+                },
+            };
         },
     };
 }

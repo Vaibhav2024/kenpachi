@@ -1,0 +1,121 @@
+---
+title: "State Checkpointing & Branching"
+description: "Undo, edit, or branch conversations without paying for the same turns twice."
+---
+
+Every turn is snapshotted automatically. You can rewind to any prior point and continue from there — **without re-sending old messages to the model**.
+
+<Tip>
+**Think save states in a game.** Run a path, don't like the outcome? Branch back and try again. The first exchange stays cached.
+</Tip>
+
+---
+
+## Key Benefits
+
+- **Zero Duplicate Token Costs:** Rewinding to a previous turn reuses cached snapshot history instead of re-sending past messages to the model API.
+- **Stateful Branching:** Create parallel conversation threads (e.g., `Branch 1` vs `Branch 2`) from a shared context checkpoint.
+- **Instant Rollback:** Restore clean conversational state instantly when handling user "Undo" or "Edit" actions in UI applications.
+
+---
+
+## How It Works
+
+1. Run standard conversation turns using `agent.run()`.
+2. Access historical checkpoints via `agent.context.listSnapshots()`.
+3. Call `agent.context.branchAt(turnIndex)` to create an isolated `AgentContext` branched at that turn.
+
+---
+
+## Basic Example
+
+In this example, we ask the model two questions, rewind the context back to after Turn 0, and branch off down a completely different path.
+
+```typescript title="time-travel.ts"
+import { Agent, createOpenAIProvider } from "kenpachi";
+
+const provider = createOpenAIProvider({ apiKey: process.env.OPENAI_API_KEY! });
+const agent = new Agent(provider, []);
+
+async function main() {
+  // Turn 0 (Snapshot #0 created automatically)
+  await agent.run("Hello! My name is Alice.");
+
+  // Turn 1 (Snapshot #1 created automatically)
+  await agent.run("What is my name?"); // Model answers: "Alice"
+
+  // 1. Retrieve all turn snapshots
+  const snapshots = agent.context.listSnapshots();
+  const turnZeroSnap = snapshots[0];
+
+  // 2. Rewind context back to Turn 0 (drops Turn 1 from the new branch)
+  const branchedContext = agent.context.branchAt(turnZeroSnap.turnIndex);
+
+  // 3. Create a new Agent instance using the branched context
+  const branchedAgent = new Agent(provider, [], branchedContext);
+
+  // 4. Resume down a new path (this agent has no memory of Turn 1)
+  const response = await branchedAgent.run("Forget my name for a second. What is 2 + 2?");
+  console.log(response.text); // "2 + 2 is 4."
+}
+
+main();
+```
+
+---
+
+## Production Use Cases
+
+In real-world applications, you rarely hardcode turn numbers. Instead, you map `turnIndex` to UI actions or database message logs.
+
+### 1. "Undo" Button in a Chat Interface
+When a user clicks **Undo** on a previous message in your UI, retrieve that message's `turnIndex` and branch the context back to before it occurred.
+
+```typescript
+// React/Next.js UI Event Handler
+async function handleUndoToTurn(targetTurnIndex: number) {
+  // Rewind context to right before targetTurnIndex
+  const rewoundContext = activeAgent.context.branchAt(targetTurnIndex - 1);
+  
+  // Re-instantiate agent with restored memory
+  activeAgent = new Agent(provider, tools, rewoundContext);
+  
+  // Truncate UI chat state
+  setMessages((prev) => prev.slice(0, targetTurnIndex));
+}
+```
+
+### 2. "Edit & Resend" Message
+When a user edits an old prompt, create a parallel branch without overwriting the original conversation history:
+
+```typescript
+async function handleEditMessage(turnIndex: number, updatedPrompt: string) {
+  // Branch off from right before the message was originally sent
+  const branchContext = activeAgent.context.branchAt(turnIndex - 1);
+  const branchAgent = new Agent(provider, tools, branchContext);
+
+  // Execute the edited prompt on the new branch
+  const result = await branchAgent.run(updatedPrompt);
+  
+  // Store branchAgent separately to support branch switching (e.g. "1 / 2" toggles)
+  return result.text;
+}
+```
+
+### 3. "Regenerate Response"
+If a model response is unsatisfactory, jump back to the user's last prompt and re-run execution cleanly without polluting context with the failed assistant attempt:
+
+```typescript
+async function handleRegenerate() {
+  const snapshots = agent.context.listSnapshots();
+  
+  // Get snapshot index of the user's last turn
+  const lastUserTurn = snapshots.at(-2)!.turnIndex;
+  
+  const cleanContext = agent.context.branchAt(lastUserTurn);
+  const freshAgent = new Agent(provider, tools, cleanContext);
+
+  const newResponse = await freshAgent.run();
+  console.log(newResponse.text);
+}
+```

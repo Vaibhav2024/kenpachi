@@ -56,4 +56,11 @@ export class AgentContext {
         branched.turnIndex = turnIndex + 1;
         return branched
     }
+
+    /** Build a fresh context pre-seeded with the given messages (used by Agent.spawn). */
+    static fromMessages(system: string | undefined, messages: Message[]): AgentContext {
+        const ctx = new AgentContext(system);
+        for (const m of messages) ctx.push(structuredClone(m));
+        return ctx;
+    }
 }

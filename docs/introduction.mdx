@@ -1,0 +1,95 @@
+---
+title: "Introduction"
+description: "What kenpachi is and why teams use it to ship agent features faster."
+---
+
+**kenpachi** is a small TypeScript SDK for building tool-using LLM agents — without pulling in a heavy vendor framework. You get a typed agent loop, pluggable providers (Anthropic & OpenAI over raw `fetch`), and a handful of production features that most minimal agent loops skip.
+
+<Tip>
+**Start here if you're evaluating:** read this page, then follow [Quickstart](/quickstart). You'll have a working agent with tools in under 5 minutes.
+</Tip>
+
+---
+
+## What you get out of the box
+
+| Feature | What it solves |
+| :--- | :--- |
+| **Typed tools** | Define tools once with Zod — the model gets a JSON schema, you get runtime validation. |
+| **Self-healing tool calls** | Bad arguments from the model are coerced or sent back as errors instead of crashing your app. |
+| **Time-travel context** | Snapshot every turn; branch or rewind without re-calling the model for history you already paid for. |
+| **Saga rollback** | Register undo handlers per tool — if a later step in the same batch fails, earlier steps are reversed. |
+| **Streaming** | Token-by-token output via `agent.stream()` or a one-line `onText` callback on `run()`. |
+| **Handoffs** | Wrap specialist agents as tools — a triage agent delegates to billing or support automatically. |
+| **Dynamic tool synthesis** | Let the model author small sandboxed helpers; secrets stay in your connector registry, never in model output. |
+
+---
+
+## Minimal example
+
+This is the whole mental model: provider → tools → agent → run.
+
+```typescript
+import { z } from "zod";
+import { Agent, defineTool, createAnthropicProvider } from "kenpachi";
+
+const getWeather = defineTool({
+  name: "get_weather",
+  description: "Get current weather for a city",
+  schema: z.object({ city: z.string() }),
+  async execute({ city }) {
+    return { city, tempC: 24, condition: "sunny" };
+  },
+});
+
+const provider = createAnthropicProvider({
+  apiKey: process.env.ANTHROPIC_API_KEY!,
+});
+
+const agent = new Agent(provider, [getWeather]);
+const result = await agent.run("What's the weather in Nashik?");
+
+console.log(result.text);
+// → "It's sunny and 24°C in Nashik."
+```
+
+No boilerplate loop, no manual tool-call parsing — `agent.run()` handles the back-and-forth until the model finishes.
+
+---
+
+## How it compares
+
+Most teams building agents today either:
+
+1. **Roll their own loop** — fast to start, painful when you need undo, repair, streaming, or multi-agent routing.
+2. **Adopt a large framework** — powerful, but heavy and opinionated.
+
+kenpachi sits in the middle: **small surface area, production-shaped defaults**. You keep control of your stack (plain TypeScript, zero vendor SDK deps) while getting the guardrails that matter once you ship to real users.
+
+---
+
+## When kenpachi is a good fit
+
+- You're building a **chat product** and need undo / edit / regenerate without duplicate API costs.
+- Your agents call **external APIs via tools** and you want validation + rollback when things go wrong.
+- You want **specialist sub-agents** (billing, support, research) behind a single front-door agent.
+- You need **streaming text** in your UI without rewriting your agent loop.
+
+---
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Install" icon="download" href="/installation">
+    Add kenpachi to your project and set up API keys.
+  </Card>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Build your first tool-using agent in a few lines.
+  </Card>
+  <Card title="Streaming" icon="wave-pulse" href="/concepts/streaming">
+    Stream tokens to your UI as the model responds.
+  </Card>
+  <Card title="Handoffs" icon="arrows-turn-right" href="/concepts/handoffs">
+    Route work to specialist agents automatically.
+  </Card>
+</CardGroup>

@@ -1,0 +1,140 @@
+---
+title: "Agent"
+description: "API reference for the Agent orchestrator — run, stream, and spawn."
+---
+
+The `Agent` class runs the model ↔ tool loop, maintains conversation state, and emits events for streaming UIs.
+
+```typescript
+import { Agent } from "kenpachi";
+```
+
+---
+
+## Constructor
+
+```typescript
+const agent = new Agent(provider, tools, context?);
+```
+
+<ParamField path="provider" type="ModelProvider" required>
+  LLM adapter — `createAnthropicProvider()` or `createOpenAIProvider()`.
+</ParamField>
+
+<ParamField path="tools" type="Tool[]" required>
+  Tools available to the model (can include `handoff()` tools).
+</ParamField>
+
+<ParamField path="context" type="AgentContext" default="new AgentContext()">
+  Optional conversation state — use a branched context for time-travel.
+</ParamField>
+
+---
+
+## `run(userInput, options?)`
+
+Runs to completion and returns `AgentRunResult`.
+
+```typescript
+const result = await agent.run("What's the weather?", {
+  onText: (chunk) => process.stdout.write(chunk),
+  onEvent: (e) => console.log(e.type),
+  maxTurns: 8,
+  maxToolRepairAttempts: 2,
+});
+
+console.log(result.text);
+console.log(result.history);
+```
+
+### AgentRunOptions
+
+<ParamField path="maxTurns" type="number" default="8">
+  Maximum model turns before stopping.
+</ParamField>
+
+<ParamField path="maxToolRepairAttempts" type="number" default="2">
+  Retries when tool arguments fail Zod validation.
+</ParamField>
+
+<ParamField path="onEvent" type="(event: AgentEvent) => void">
+  Fires for every event: `turn_start`, `text_delta`, `tool_call`, `tool_result`, `rollback_start`, `run_end`, etc.
+</ParamField>
+
+<ParamField path="onText" type="(text: string) => void">
+  Shorthand — called on each `text_delta` (token-level when the provider supports streaming).
+</ParamField>
+
+### AgentRunResult
+
+<ResponseField name="text" type="string">
+  Plain text extracted from the final assistant message.
+</ResponseField>
+
+<ResponseField name="message" type="Message">
+  Full final assistant `Message` object.
+</ResponseField>
+
+<ResponseField name="content" type="Message['content']">
+  Alias for `message.content` (backward compatible).
+</ResponseField>
+
+<ResponseField name="history" type="Message[]">
+  Full message history after the run.
+</ResponseField>
+
+---
+
+## `stream(userInput, options?)`
+
+Async generator yielding `AgentEvent` on each step, then returning `AgentRunResult`.
+
+```typescript
+for await (const event of agent.stream("Hello")) {
+  if (event.type === "text_delta") process.stdout.write(event.text);
+}
+```
+
+Same options as `run()`. Internally, `run()` is implemented as a thin wrapper around `stream()`.
+
+See [Streaming](/concepts/streaming) for all event types and UI patterns.
+
+---
+
+## `spawn(seedMessages?)`
+
+Creates a new `Agent` with the same provider and tools but a **fresh** context, optionally seeded with messages.
+
+```typescript
+const sub = agent.spawn(parentMessages);
+const result = await sub.run("Continue this task");
+```
+
+Used internally by [handoffs](/concepts/handoffs). Call directly when you need an isolated sub-run without mutating the parent.
+
+---
+
+## `context`
+
+Public `AgentContext` instance — snapshots, branching, message history.
+
+```typescript
+await agent.run("Hello");
+const snapshots = agent.context.listSnapshots();
+const branched = agent.context.branchAt(0);
+const branchedAgent = new Agent(provider, tools, branched);
+```
+
+See [State Checkpointing](/concepts/state-checkpointing).
+
+---
+
+## Other methods
+
+<ResponseField name="getProvider()" type="ModelProvider">
+  Returns the provider passed to the constructor.
+</ResponseField>
+
+<ResponseField name="getTools()" type="Tool[]">
+  Returns the tool list.
+</ResponseField>

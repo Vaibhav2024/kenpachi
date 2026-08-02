@@ -1,0 +1,137 @@
+---
+title: "Streaming"
+description: "Stream model output token-by-token to your UI or logs."
+---
+
+Users expect chat apps to show text as it's generated — not after a 10-second pause. kenpachi supports streaming out of the box with both Anthropic and OpenAI providers.
+
+<Tip>
+**Just want streaming text in your UI?** Use the `onText` callback on `agent.run()` — no async generators required.
+</Tip>
+
+---
+
+## Option 1: `onText` (simplest)
+
+If you only need to print or append text chunks, pass `onText` to `run()`:
+
+```typescript
+import { Agent, createAnthropicProvider } from "kenpachi";
+
+const provider = createAnthropicProvider({
+  apiKey: process.env.ANTHROPIC_API_KEY!,
+});
+const agent = new Agent(provider, []);
+
+process.stdout.write("Agent: ");
+const result = await agent.run("Tell me a short joke", {
+  onText: (chunk) => process.stdout.write(chunk),
+});
+process.stdout.write("\n");
+
+console.log("Done:", result.text);
+```
+
+`run()` still returns the full `AgentRunResult` when finished — streaming is additive, not a separate API shape.
+
+---
+
+## Option 2: `agent.stream()` (full events)
+
+Use `stream()` when you need visibility into tool calls, repair attempts, rollbacks, or handoffs — not just text.
+
+```typescript
+for await (const event of agent.stream("What's 17 × 23?")) {
+  switch (event.type) {
+    case "text_delta":
+      process.stdout.write(event.text);
+      break;
+    case "tool_call_start":
+      console.log("\n→ calling", event.name);
+      break;
+    case "tool_result":
+      console.log("← result:", event.result);
+      break;
+    case "run_end":
+      console.log("\nfinished:", event.stopReason);
+      break;
+  }
+}
+```
+
+When the generator completes, it returns the same `AgentRunResult` that `run()` would:
+
+```typescript
+const gen = agent.stream("Hello");
+let result;
+while (true) {
+  const { value, done } = await gen.next();
+  if (done) {
+    result = value;
+    break;
+  }
+  if (value.type === "text_delta") process.stdout.write(value.text);
+}
+console.log(result.text);
+```
+
+---
+
+## Event types
+
+| Event | When it fires |
+| :--- | :--- |
+| `turn_start` | A new model turn begins |
+| `text_delta` | Incremental text from the model |
+| `tool_call_start` | Model started emitting a tool call |
+| `tool_call_args_delta` | Partial JSON arguments streaming in |
+| `model_response` | Full assistant message for the turn |
+| `tool_call` | Tool about to execute (with parsed args) |
+| `tool_result` | Tool finished (success or error) |
+| `tool_repair_attempt` | Schema validation failed; retrying |
+| `rollback_start` / `rollback_step` | Saga compensation running |
+| `run_end` | Run finished (`stopReason` included) |
+
+Use `onEvent` on `run()` if you want these callbacks without managing an async generator:
+
+```typescript
+await agent.run("Book a flight", {
+  onEvent: (e) => {
+    if (e.type === "tool_call") console.log("calling", e.name);
+  },
+  onText: (chunk) => appendToUI(chunk),
+});
+```
+
+---
+
+## Provider support
+
+Both `createAnthropicProvider` and `createOpenAIProvider` implement `streamTurn()` automatically. No extra config — if the provider supports streaming, kenpachi uses it.
+
+Providers that only implement `createTurn()` (e.g. test fakes) still work: text arrives as a single `text_delta` so your event handlers stay consistent.
+
+---
+
+## Building a chat UI
+
+A typical React pattern:
+
+```typescript
+const [messages, setMessages] = useState<Message[]>([]);
+const [streaming, setStreaming] = useState("");
+
+async function send(userText: string) {
+  setMessages((m) => [...m, { role: "user", text: userText }]);
+  setStreaming("");
+
+  const result = await agent.run(userText, {
+    onText: (chunk) => setStreaming((s) => s + chunk),
+  });
+
+  setMessages((m) => [...m, { role: "assistant", text: result.text }]);
+  setStreaming("");
+}
+```
+
+Show `streaming` while the run is in progress; commit `result.text` when done.

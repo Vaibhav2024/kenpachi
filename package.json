@@ -32,6 +32,8 @@
     "example:3": "tsx examples/3-self-healing.ts",
     "example:5": "tsx examples/5-memory.ts",
     "example:6": "tsx examples/6-rollback.ts",
+    "example:7": "tsx examples/7-streaming.ts",
+    "example:8": "tsx examples/8-handoffs.ts",
     "prepublishOnly": "npm run typecheck && npm run test && npm run build"
   },
   "keywords": [

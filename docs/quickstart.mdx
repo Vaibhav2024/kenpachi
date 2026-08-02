@@ -1,0 +1,95 @@
+---
+title: "Quickstart"
+description: "Build a tool-using agent in under 5 minutes."
+---
+
+This guide covers the three patterns you'll use most: plain chat, tools, and streaming.
+
+---
+
+## 1. Plain chat (no tools)
+
+```typescript
+import { Agent, createAnthropicProvider } from "kenpachi";
+
+const agent = new Agent(
+  createAnthropicProvider({ apiKey: process.env.ANTHROPIC_API_KEY! }),
+  []
+);
+
+const result = await agent.run("Write a one-sentence greeting.");
+console.log(result.text);
+```
+
+`agent.run()` loops until the model stops calling tools and returns final text. For chat-only agents, pass an empty tools array.
+
+---
+
+## 2. Agent with a tool
+
+Define a tool with `defineTool`, pass it to the agent, and ask a question that requires it:
+
+```typescript
+import { z } from "zod";
+import { Agent, defineTool, createAnthropicProvider } from "kenpachi";
+
+const getWeather = defineTool({
+  name: "get_weather",
+  description: "Get current weather for a city",
+  schema: z.object({
+    city: z.string().describe("City name"),
+  }),
+  async execute({ city }) {
+    // Replace with your real API call
+    return { city, tempC: 24, condition: "sunny" };
+  },
+});
+
+const agent = new Agent(
+  createAnthropicProvider({ apiKey: process.env.ANTHROPIC_API_KEY! }),
+  [getWeather]
+);
+
+const result = await agent.run("What's the weather in Nashik?");
+console.log(result.text);
+// → "It's sunny and 24°C in Nashik."
+```
+
+kenpachi handles the full loop: model calls `get_weather` → your `execute` runs → result goes back to the model → model writes the final answer.
+
+---
+
+## 3. Stream text to your UI
+
+Add `onText` to show tokens as they arrive:
+
+```typescript
+process.stdout.write("Agent: ");
+
+const result = await agent.run("Tell me a fun fact about Nashik", {
+  onText: (chunk) => process.stdout.write(chunk),
+});
+
+process.stdout.write("\n");
+```
+
+See [Streaming](/concepts/streaming) for the full event API (`agent.stream()`).
+
+---
+
+## What's next?
+
+<CardGroup cols={2}>
+  <Card title="Handoffs" icon="arrows-turn-right" href="/concepts/handoffs">
+    Delegate to billing, support, or other specialist agents.
+  </Card>
+  <Card title="Time-travel context" icon="clock-rotate-left" href="/concepts/state-checkpointing">
+    Undo, edit, or branch conversations without extra API cost.
+  </Card>
+  <Card title="Self-healing tools" icon="wand-magic-sparkles" href="/concepts/schema-validation-recovery">
+    Recover when the model sends bad tool arguments.
+  </Card>
+  <Card title="Agent API" icon="book" href="/api-reference/agent">
+    Full reference for run(), stream(), and options.
+  </Card>
+</CardGroup>

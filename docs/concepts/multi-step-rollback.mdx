@@ -1,0 +1,48 @@
+---
+title: "Multi-Step Rollbacks"
+description: "Undo earlier steps in a multi-tool execution batch if a subsequent step fails."
+---
+
+When a model calls several tools in one turn — reserve a seat, then charge a card — a failure on step two can leave step one's side effects in place. kenpachi implements **saga-style rollback**: register an undo in each tool, and if a later tool in the same batch fails, undos run in reverse order.
+
+<Tip>
+Think of `registerCompensation` as "if anything after me fails, run this cleanup."
+</Tip>
+
+---
+
+## Example
+
+```typescript
+import { z } from "zod";
+import { Agent, defineTool } from "kenpachi";
+
+const reserveSeat = defineTool({
+  name: "reserve_seat",
+  description: "Reserves a seat for a user",
+  schema: z.object({ seatId: z.string() }),
+  async execute({ seatId }, ctx) {
+    console.log(`Reserved seat ${seatId}`);
+
+    // Register compensating action
+    ctx.registerCompensation(async () => {
+      console.log(`Rollback: Released seat ${seatId}`);
+    });
+
+    return { status: "held", seatId };
+  },
+});
+
+const processPayment = defineTool({
+  name: "process_payment",
+  description: "Charges user payment card",
+  schema: z.object({ amount: z.number() }),
+  async execute({ amount }) {
+    // Payment fails
+    throw new Error("Card declined: Insufficient funds");
+  },
+});
+
+// If the model calls reserveSeat and processPayment together,
+// the reserveSeat hold is automatically released when processPayment throws.
+```

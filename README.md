@@ -82,6 +82,44 @@ const tool = synthesizeTool(
 );
 ```
 
+## Streaming
+
+```typescript
+// Full event stream — token-by-token when the provider supports it
+for await (const event of agent.stream("Tell me a story")) {
+  if (event.type === "text_delta") process.stdout.write(event.text);
+  if (event.type === "tool_call_start") console.log("\ncalling", event.name);
+}
+
+// Or the simpler shorthand on run():
+const result = await agent.run("Tell me a story", {
+  onText: (chunk) => process.stdout.write(chunk),
+});
+console.log(result.text);
+```
+
+`agent.run()` still works exactly as before — it's implemented as a thin wrapper
+around `stream()` that returns the final `AgentRunResult`. Providers without
+`streamTurn()` still work with both APIs; they just won't emit token-level deltas.
+
+## Handoffs
+
+```typescript
+import { handoff } from "kenpachi-sdk";
+
+const billingHandoff = handoff(billingAgent, "Use for billing or payment questions", {
+  id: "billing", // tool name becomes handoff_billing
+});
+
+const triageAgent = new Agent(provider, [billingHandoff, techSupportHandoff]);
+```
+
+A handoff is a normal tool from the parent agent's point of view. Internally it
+spawns the target agent with a fresh context (via `Agent.spawn()`), seeded with
+the parent conversation according to `context` (`"full"` by default, or
+`"summary"` / `"none"`), runs it to completion, and returns its answer as plain
+text.
+
 ## Security notes
 
 - The sandbox (`src/sandbox.ts`) uses Node's `vm` module for **isolation**, not
