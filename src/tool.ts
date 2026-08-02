@@ -19,7 +19,7 @@ export interface ToolContext {
 export interface Tool<Args = any, Result = any> {
     name: string;
     description: string;
-    schema: z.ZodType<Args>
+    schema: z.ZodTypeAny;
     execute: (args: Args, ctx: ToolContext) => Promise<Result>;
     /** Marks this tool as safe to auto-retry with corrected args (default true). */
     repairable?: boolean
@@ -64,12 +64,12 @@ export function serializeZodSchema(schema: z.ZodTypeAny): Record<string, unknown
 
     // Handle unwrapped vs definitions-wrapped edge cases
     const definitions = rawSchema.definitions as Record<string, any> | undefined;
-    const properties = (rawSchema.properties as Record<string, unknown>) 
-        ?? definitions?.root?.properties 
+    const properties = (rawSchema.properties as Record<string, unknown>)
+        ?? definitions?.root?.properties
         ?? {};
 
-    const required = (rawSchema.required as string[]) 
-        ?? definitions?.root?.required 
+    const required = (rawSchema.required as string[])
+        ?? definitions?.root?.required
         ?? Object.keys(properties);
 
     return {
@@ -90,4 +90,4 @@ export function toToolSchema(tool: Tool): ToolSchema {
         description: tool.description,
         parameters: serializeZodSchema(tool.schema),
     };
-}
+}
