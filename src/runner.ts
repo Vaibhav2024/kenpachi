@@ -118,17 +118,26 @@ export class Agent {
         completed.push({ toolName: call.name, undo: outcome.undo });
       }
 
-      if (sagaFailed && completed.some((c) => c.undo)) {
-        yield { type: "rollback_start", reason: sagaFailed.error };
-        for (const step of [...completed].reverse()) {
-          if (!step.undo) continue;
-          try {
-            await step.undo();
-            yield { type: "rollback_step", toolName: step.toolName, ok: true };
-          } catch {
-            yield { type: "rollback_step", toolName: step.toolName, ok: false };
+      if (sagaFailed) {
+        if (completed.some((c) => c.undo)) {
+          yield { type: "rollback_start", reason: sagaFailed.error };
+          for (const step of [...completed].reverse()) {
+            if (!step.undo) continue;
+            try {
+              await step.undo();
+              yield { type: "rollback_step", toolName: step.toolName, ok: true };
+            } catch {
+              yield { type: "rollback_step", toolName: step.toolName, ok: false };
+            }
           }
         }
+        this.context.push({ role: "tool", content: toolResults });
+        this.context.snapshot(`turn-${turn}-tools-failed`);
+        yield { type: "run_end", stopReason: "error" };
+        return this.buildRunResult({
+          role: "assistant",
+          content: [{ type: "text", text: `Tool execution failed for ${sagaFailed.toolName}: ${sagaFailed.error}` }],
+        });
       }
 
       this.context.push({ role: "tool", content: toolResults });
