@@ -56,28 +56,44 @@ export function serializeZodSchema(schema: any): Record<string, unknown> {
         return { type: "object", properties: {}, required: [] };
     }
 
-    try {
-        // Use target "jsonSchema7" or no target to keep properties strictly at root
-        const rawSchema = zodToJsonSchemaLib(schema, {
-            $refStrategy: "none"
-        }) as Record<string, unknown>;
+    // 1. Direct Zod Shape Extraction (Bulletproof Fallback)
+    // If schema is a ZodObject, manually extract key properties
+    let properties: Record<string, any> = {};
+    let required: string[] = [];
 
-        // Direct extract
-        const properties = (rawSchema.properties as Record<string, unknown>)
-            ?? (rawSchema as any).definitions?.root?.properties
-            ?? {};
+    const shape = schema.shape || schema._def?.shape?.();
 
-        const required = (rawSchema.required as string[])
-            ?? (rawSchema as any).definitions?.root?.required
-            ?? Object.keys(properties);
+    if (shape) {
+        for (const [key, value] of Object.entries(shape)) {
+            const isOptional = (value as any)?._def?.typeName === "ZodOptional";
+            properties[key] = {
+                type: "string", // standard default fallback
+                description: (value as any)?.description || key,
+            };
+            if (!isOptional) {
+                required.push(key);
+            }
+        }
 
         return {
             type: "object",
             properties,
             ...(required.length > 0 ? { required } : {}),
         };
-    } catch (e) {
-        console.error("Zod serialization failed:", e);
+    }
+
+    // 2. Standard zod-to-json-schema fallback if shape extraction didn't match
+    try {
+        const raw = zodToJsonSchemaLib(schema, { $refStrategy: "none" }) as any;
+        const props = raw.properties || raw.definitions?.root?.properties || {};
+        const req = raw.required || raw.definitions?.root?.required || Object.keys(props);
+        return {
+            type: "object",
+            properties: props,
+            ...(req.length > 0 ? { required: req } : {}),
+        };
+    } catch (err) {
+        console.error("Failed to serialize schema:", err);
         return { type: "object", properties: {}, required: [] };
     }
 }
