@@ -51,26 +51,29 @@ export function defineTool<Args, Result>(def: {
  * Universal Zod schema serializer converting ZodType into standard JSON Schema object.
  * Strips non-standard outer fields like $schema.
  */
-export function serializeZodSchema(schema: z.ZodTypeAny): Record<string, unknown> {
+export function serializeZodSchema(schema: any): Record<string, unknown> {
     if (!schema) {
         return { type: "object", properties: {}, required: [] };
     }
 
-    // Force zod-to-json-schema to generate an inline root object without $ref wrappers
+    // 1. Convert Zod schema without $ref wrapping
     const rawSchema = zodToJsonSchemaLib(schema, {
         $refStrategy: "none",
-        target: "openAi"
     }) as Record<string, unknown>;
 
-    // Handle unwrapped vs definitions-wrapped edge cases
-    const definitions = rawSchema.definitions as Record<string, any> | undefined;
-    const properties = (rawSchema.properties as Record<string, unknown>)
-        ?? definitions?.root?.properties
-        ?? {};
+    // Safely extract definitions object with type casting
+    const definitions = (rawSchema.definitions ?? {}) as Record<string, any>;
 
-    const required = (rawSchema.required as string[])
-        ?? definitions?.root?.required
-        ?? Object.keys(properties);
+    // 2. Safely extract properties & required array from top level OR definitions.root
+    const properties =
+        (rawSchema.properties as Record<string, unknown>) ??
+        definitions.root?.properties ??
+        {};
+
+    const required =
+        (rawSchema.required as string[]) ??
+        definitions.root?.required ??
+        Object.keys(properties);
 
     return {
         type: "object",
