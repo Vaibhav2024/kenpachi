@@ -9,7 +9,7 @@ async function main() {
         textTurn("Branched path Turn 2")
     ]);
 
-    const agent = new Agent(provider, []);
+    const agent = new Agent(provider);
 
     // 1. Run Turn 1
     await agent.run("first message");
@@ -27,7 +27,7 @@ async function main() {
 
     console.log("Original History Length:", agent.context.getMessages().length); // 4 messages
     console.log("Branched History Length:", branchedAgent.context.getMessages().length); // 4 messages
-    
+
     console.log("\nOriginal Path Last Message:", agent.context.getMessages().at(-1));
     console.log("Branched Path Last Message:", branchedAgent.context.getMessages().at(-1));
 }
