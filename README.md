@@ -6,6 +6,8 @@ A small, typed agent SDK for building tool-using LLM agents in TypeScript —
 built from scratch on top of raw provider `fetch` calls (no vendor SDK
 dependency) with a few things most minimal agent loops skip:
 
+### 📖 **Full Documentation:** [https://kenpachi.mintlify.site/introduction](https://kenpachi.mintlify.site/introduction)
+
 - **Time-travel context** — every turn is snapshotted; branch and resume from
   any prior point without re-calling the model for turns you already ran.
 - **Self-healing tool calls** — malformed tool arguments are caught by Zod and
