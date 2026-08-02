@@ -1,6 +1,6 @@
 {
   "name": "kenpachi",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "A production-shaped agent SDK: typed tools, time-travel context, self-healing tool calls, saga rollback, and dynamic tool synthesis.",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -35,7 +35,8 @@
     "example:6": "tsx examples/6-rollback.ts",
     "example:7": "tsx examples/7-streaming.ts",
     "example:8": "tsx examples/8-handoffs.ts",
-    "prepublishOnly": "npm run typecheck && npm run test && npm run build"
+    "prepublishOnly": "npm run typecheck && npm run test && npm run build",
+    "ship": "npm run build && git add . && npm version patch --force -m \"release: %s\" && git push origin main --follow-tags && npm publish"
   },
   "keywords": [
     "agent",

@@ -56,13 +56,21 @@ export function serializeZodSchema(schema: z.ZodTypeAny): Record<string, unknown
         return { type: "object", properties: {}, required: [] };
     }
 
-    const rawSchema = zodToJsonSchemaLib(schema, { target: "openAi" }) as Record<string, unknown>;
+    // Force zod-to-json-schema to generate an inline root object without $ref wrappers
+    const rawSchema = zodToJsonSchemaLib(schema, {
+        $refStrategy: "none",
+        target: "openAi"
+    }) as Record<string, unknown>;
 
-    // Strip non-standard outer fields like $schema
-    const { $schema, ...cleanSchema } = rawSchema;
+    // Handle unwrapped vs definitions-wrapped edge cases
+    const definitions = rawSchema.definitions as Record<string, any> | undefined;
+    const properties = (rawSchema.properties as Record<string, unknown>) 
+        ?? definitions?.root?.properties 
+        ?? {};
 
-    const properties = (cleanSchema.properties as Record<string, unknown>) ?? {};
-    const required = (cleanSchema.required as string[]) ?? Object.keys(properties);
+    const required = (rawSchema.required as string[]) 
+        ?? definitions?.root?.required 
+        ?? [];
 
     return {
         type: "object",

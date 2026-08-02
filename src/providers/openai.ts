@@ -4,26 +4,20 @@ import { serializeZodSchema } from "../tool.js";
 
 export function formatToolsForOpenAI(tools: any[]) {
     return tools.map((tool) => {
-        const zodSchema = tool.schema || tool.inputSchema;
-        const serialized = zodSchema 
-            ? serializeZodSchema(zodSchema)
-            : (tool.parameters && tool.parameters.properties 
+        // If it's a kenpachi Tool object, serialize tool.schema; otherwise handle ToolSchema
+        const schemaObj = tool.schema || tool.inputSchema;
+        const serialized = schemaObj 
+            ? serializeZodSchema(schemaObj)
+            : (tool.parameters?.properties 
                 ? tool.parameters 
                 : (tool.parameters ? serializeZodSchema(tool.parameters) : { type: "object", properties: {}, required: [] }));
-
-        const properties = (serialized.properties as Record<string, unknown>) ?? {};
-        const required = (serialized.required as string[]) ?? Object.keys(properties);
 
         return {
             type: "function" as const,
             function: {
                 name: tool.name,
                 description: tool.description,
-                parameters: {
-                    type: "object" as const,
-                    properties,
-                    ...(required.length > 0 ? { required } : {}),
-                },
+                parameters: serialized,
             },
         };
     });
