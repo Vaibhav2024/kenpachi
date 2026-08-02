@@ -1,5 +1,33 @@
 import type { Message, ModelProvider, ModelTurnResult, StreamChunk, ToolSchema } from "../types.js";
 import { parseSSE } from "./sse.js";
+import { serializeZodSchema } from "../tool.js";
+
+export function formatToolsForOpenAI(tools: any[]) {
+    return tools.map((tool) => {
+        const zodSchema = tool.schema || tool.inputSchema;
+        const serialized = zodSchema 
+            ? serializeZodSchema(zodSchema)
+            : (tool.parameters && tool.parameters.properties 
+                ? tool.parameters 
+                : (tool.parameters ? serializeZodSchema(tool.parameters) : { type: "object", properties: {}, required: [] }));
+
+        const properties = (serialized.properties as Record<string, unknown>) ?? {};
+        const required = (serialized.required as string[]) ?? Object.keys(properties);
+
+        return {
+            type: "function" as const,
+            function: {
+                name: tool.name,
+                description: tool.description,
+                parameters: {
+                    type: "object" as const,
+                    properties,
+                    ...(required.length > 0 ? { required } : {}),
+                },
+            },
+        };
+    });
+}
 
 export function createOpenAIProvider(opts: { apiKey: string; model: string }): ModelProvider {
     const model = opts.model;
@@ -13,7 +41,7 @@ export function createOpenAIProvider(opts: { apiKey: string; model: string }): M
             ];
 
             // 1. Format tools cleanly
-            const formattedTools = tools.map(toOpenAITool);
+            const formattedTools = formatToolsForOpenAI(tools);
 
             // 2. Build payload - ONLY include `tools` if array is NOT empty
             const bodyPayload: Record<string, unknown> = {
@@ -23,6 +51,9 @@ export function createOpenAIProvider(opts: { apiKey: string; model: string }): M
 
             if (formattedTools.length > 0) {
                 bodyPayload.tools = formattedTools;
+                if (process.env.DEBUG || process.env.VERBOSE_LOGS) {
+                    console.log(JSON.stringify(formattedTools, null, 2));
+                }
             }
 
             const res = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -55,10 +86,13 @@ export function createOpenAIProvider(opts: { apiKey: string; model: string }): M
                 stream: true,
             };
 
-            const formattedTools = tools.map(toOpenAITool);
+            const formattedTools = formatToolsForOpenAI(tools);
 
             if (formattedTools.length > 0) {
                 bodyPayload.tools = formattedTools;
+                if (process.env.DEBUG || process.env.VERBOSE_LOGS) {
+                    console.log(JSON.stringify(formattedTools, null, 2));
+                }
             }
 
             const res = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -202,25 +236,6 @@ function fromOpenAIResponse(data: any): ModelTurnResult {
         usage: {
             inputTokens: data.usage?.prompt_tokens ?? 0,
             outputTokens: data.usage?.completion_tokens ?? 0,
-        },
-    };
-}
-
-function toOpenAITool(t: ToolSchema) {
-    const params = t.parameters ?? {};
-    const serializedProperties = (params.properties as Record<string, unknown>) ?? {};
-    const serializedRequired = (params.required as string[]) ?? [];
-
-    return {
-        type: "function" as const,
-        function: {
-            name: t.name,
-            description: t.description,
-            parameters: {
-                type: "object" as const,
-                properties: serializedProperties,
-                ...(serializedRequired.length > 0 ? { required: serializedRequired } : {}),
-            },
         },
     };
 }

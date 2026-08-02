@@ -1,5 +1,30 @@
 import type { Message, ModelProvider, ModelTurnResult, ToolSchema, ContentBlock, StreamChunk } from "../types.js";
 import { parseSSE } from "./sse.js";
+import { serializeZodSchema } from "../tool.js";
+
+export function formatToolsForAnthropic(tools: any[]) {
+    return tools.map((tool) => {
+        const zodSchema = tool.schema || tool.inputSchema;
+        const serialized = zodSchema 
+            ? serializeZodSchema(zodSchema)
+            : (tool.parameters && tool.parameters.properties 
+                ? tool.parameters 
+                : (tool.parameters ? serializeZodSchema(tool.parameters) : { type: "object", properties: {}, required: [] }));
+
+        const properties = (serialized.properties as Record<string, unknown>) ?? {};
+        const required = (serialized.required as string[]) ?? Object.keys(properties);
+
+        return {
+            name: tool.name,
+            description: tool.description,
+            input_schema: {
+                type: "object" as const,
+                properties,
+                ...(required.length > 0 ? { required } : {}),
+            },
+        };
+    });
+}
 
 export function createAnthropicProvider(opts: {
     apiKey: string;
@@ -15,7 +40,7 @@ export function createAnthropicProvider(opts: {
                 max_tokens: 4096,
                 system,
                 messages: messages.map(toAnthropicMessage),
-                tools: tools.map(toAnthropicTool)
+                tools: formatToolsForAnthropic(tools)
             };
 
             const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -50,7 +75,7 @@ export function createAnthropicProvider(opts: {
                     max_tokens: 4096,
                     system,
                     messages: messages.map(toAnthropicMessage),
-                    tools: tools.map(toAnthropicTool),
+                    tools: formatToolsForAnthropic(tools),
                     stream: true,
                 }),
             });

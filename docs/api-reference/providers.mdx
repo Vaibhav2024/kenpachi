@@ -71,7 +71,37 @@ If you only implement `createTurn`, streaming still works — text is emitted as
 
 ## Tool Serialization Across Providers
 
-`kenpachi` automatically maps tool Zod schemas to provider-specific function declarations:
+`kenpachi` automatically converts Zod tool schemas into standard JSON Schemas (`serializeZodSchema`) and maps them to provider-specific function declaration shapes:
 
-- **Anthropic**: Maps tools to `{ name, description, input_schema: { type: "object", properties, required } }`.
-- **OpenAI**: Maps tools to `{ type: "function", function: { name, description, parameters: { type: "object", properties, required } } }`.
+### Anthropic Provider
+Maps tools to Anthropic's expected `input_schema` shape:
+
+```typescript
+{
+  name: tool.name,
+  description: tool.description,
+  input_schema: {
+    type: "object",
+    properties: serializedProperties,
+    required: serializedRequired
+  }
+}
+```
+
+### OpenAI Provider
+Maps tools to OpenAI's function declaration shape:
+
+```typescript
+{
+  type: "function",
+  function: {
+    name: tool.name,
+    description: tool.description,
+    parameters: {
+      type: "object",
+      properties: serializedProperties,
+      required: serializedRequired
+    }
+  }
+}
+```

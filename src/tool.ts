@@ -53,7 +53,7 @@ export function defineTool<Args, Result>(def: {
  */
 export function serializeZodSchema(schema: z.ZodTypeAny): Record<string, unknown> {
     if (!schema) {
-        return { type: "object", properties: {} };
+        return { type: "object", properties: {}, required: [] };
     }
 
     const rawSchema = zodToJsonSchemaLib(schema, { target: "openAi" }) as Record<string, unknown>;
@@ -62,13 +62,12 @@ export function serializeZodSchema(schema: z.ZodTypeAny): Record<string, unknown
     const { $schema, ...cleanSchema } = rawSchema;
 
     const properties = (cleanSchema.properties as Record<string, unknown>) ?? {};
-    const required = (cleanSchema.required as string[]) ?? [];
+    const required = (cleanSchema.required as string[]) ?? Object.keys(properties);
 
     return {
         type: "object",
         properties,
-        ...(Array.isArray(required) && required.length > 0 ? { required } : {}),
-        ...cleanSchema,
+        ...(required.length > 0 ? { required } : {}),
     };
 }
 

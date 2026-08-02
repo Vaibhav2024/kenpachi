@@ -13,9 +13,10 @@ This is on by default for every `defineTool` (`repairable: true`). You don't opt
 
 ## What happens step by step
 
-1. **Validate** — arguments are checked with `schema.safeParse()`.
-2. **Coerce** — simple fixes (e.g. `"6"` → `6`) are applied automatically.
-3. **Retry or inform** — if still invalid, the formatted error is returned to the model as a tool error so it can try again with corrected args.
+1. **Serialize** — Tool Zod schemas are dynamically converted to JSON Schema (`type: "object"`, `properties`, `required`) using `serializeZodSchema` so the model receives exact parameter keys.
+2. **Validate** — Arguments sent back by the model are checked with `schema.safeParse()`.
+3. **Coerce** — Simple fixes (e.g. `"6"` → `6`) are applied automatically.
+4. **Retry or inform** — If still invalid, the formatted error is returned to the model as a tool error so it can try again with corrected args.
 
 You'll see `tool_repair_attempt` events if you use `onEvent` or `stream()`.
 

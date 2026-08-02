@@ -7,8 +7,8 @@ export { AgentContext } from "./context.js";
 export { defineTool, toToolSchema, zodToJsonSchema, serializeZodSchema } from "./tool.js";
 export type { Tool, ToolContext } from "./tool.js";
 
-export { createAnthropicProvider } from "./providers/anthropic.js";
-export { createOpenAIProvider } from "./providers/openai.js";
+export { createAnthropicProvider, formatToolsForAnthropic } from "./providers/anthropic.js";
+export { createOpenAIProvider, formatToolsForOpenAI } from "./providers/openai.js";
 
 export { ConnectorRegistry, synthesizeTool, proposeToolSpecTool } from "./kenpachi.js";
 export type { Connector, SynthesizedToolSpec } from "./kenpachi.js";

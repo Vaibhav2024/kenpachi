@@ -26,7 +26,7 @@ import { defineTool } from "kenpachi";
     </ResponseField>
 
     <ResponseField name="schema" type="z.ZodType<Args>" required>
-      Zod schema defining expected parameters.
+      Zod schema defining expected parameters. Automatically converted into standard JSON Schema (`type: "object"`, `properties`, `required`) for LLM model tool arrays via `serializeZodSchema`.
     </ResponseField>
 
     <ResponseField name="execute" type="(args: Args, ctx: ToolContext) => Promise<Result>" required>
