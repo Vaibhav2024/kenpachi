@@ -5,7 +5,7 @@ import { Agent, defineTool, createOpenAIProvider } from "../src/index.js";
 import { createLogger } from "./logger.js";
 import axios from "axios";
 
-const apiKey = "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";
+const apiKey = "";
 if (!apiKey) throw new Error("Set OPENAI_API_KEY before running this demo");
 
 const getWeather = defineTool({
