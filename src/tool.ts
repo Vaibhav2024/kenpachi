@@ -70,7 +70,7 @@ export function serializeZodSchema(schema: z.ZodTypeAny): Record<string, unknown
 
     const required = (rawSchema.required as string[]) 
         ?? definitions?.root?.required 
-        ?? [];
+        ?? Object.keys(properties);
 
     return {
         type: "object",

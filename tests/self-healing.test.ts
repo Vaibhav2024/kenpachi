@@ -21,7 +21,7 @@ describe("self-healing tool loop", () => {
 
         const events: any[] = [];
         const agent = new Agent(provider, [tool]);
-        const result = await agent.run("double 21", { onEvent: (e) => events.push(e) });
+        const result = await agent.run("double 21", { onEvent: (e) => events.push(e), maxToolRepairAttempts: 2 });
 
         expect(result.content[0]).toEqual({ type: "text", text: "42" });
         const repairEvent = events.find((e) => e.type === "tool_repair_attempt");

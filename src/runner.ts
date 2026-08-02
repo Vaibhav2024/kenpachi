@@ -58,7 +58,7 @@ export class Agent {
   /** Same loop as run(), yielding every event — including token-level deltas when available. */
   async *stream(userInput: string, options: AgentRunOptions = {}): AsyncGenerator<AgentEvent, AgentRunResult, unknown> {
     const maxTurns = options.maxTurns ?? 8;
-    const maxRepairAttempts = options.maxToolRepairAttempts ?? 2;
+    const maxRepairAttempts = options.maxToolRepairAttempts ?? 0;
 
     this.context.push({ role: "user", content: [{ type: "text", text: userInput }] });
 
