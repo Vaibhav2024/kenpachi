@@ -39,10 +39,11 @@ const multiply = defineTool({
   },
 });
 
-const agent = new Agent(
-  createOpenAIProvider({ apiKey: process.env.OPENAI_API_KEY!, model: "gpt-4o" }),
-  [multiply]
-);
+const provider = createOpenAIProvider({
+  apiKey: process.env.OPENAI_API_KEY!,
+  model: "gpt-4o",
+});
+const agent = new Agent(provider, [multiply]);
 
 // Model might send { a: "6", b: "7" } — kenpachi coerces and succeeds.
 const result = await agent.run("What is 6 times 7?");

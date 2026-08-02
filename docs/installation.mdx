@@ -51,10 +51,11 @@ In Node, load them with `process.env.ANTHROPIC_API_KEY` — or use a `.env` file
 ```typescript
 import { Agent, createAnthropicProvider } from "kenpachi";
 
-const agent = new Agent(
-  createAnthropicProvider({ apiKey: process.env.ANTHROPIC_API_KEY! }),
-  []
-);
+const provider = createAnthropicProvider({
+  apiKey: process.env.ANTHROPIC_API_KEY!,
+  model: "claude-sonnet-4-6",
+});
+const agent = new Agent(provider, []);
 
 const result = await agent.run("Say hello in one sentence.");
 console.log(result.text);

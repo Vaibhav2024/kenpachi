@@ -12,10 +12,11 @@ This guide covers the three patterns you'll use most: plain chat, tools, and str
 ```typescript
 import { Agent, createAnthropicProvider } from "kenpachi";
 
-const agent = new Agent(
-  createAnthropicProvider({ apiKey: process.env.ANTHROPIC_API_KEY!, model: "claude-sonnet-4-6" }),
-  []
-);
+const provider = createAnthropicProvider({
+  apiKey: process.env.ANTHROPIC_API_KEY!,
+  model: "claude-sonnet-4-6",
+});
+const agent = new Agent(provider, []);
 
 const result = await agent.run("Write a one-sentence greeting.");
 console.log(result.text);
@@ -45,10 +46,11 @@ const getWeather = defineTool({
   },
 });
 
-const agent = new Agent(
-  createAnthropicProvider({ apiKey: process.env.ANTHROPIC_API_KEY!, model: "claude-sonnet-4-6" }),
-  [getWeather]
-);
+const provider = createAnthropicProvider({
+  apiKey: process.env.ANTHROPIC_API_KEY!,
+  model: "claude-sonnet-4-6",
+});
+const agent = new Agent(provider, [getWeather]);
 
 const result = await agent.run("What's the weather in Nashik?");
 console.log(result.text);

@@ -34,7 +34,10 @@ In this example, we ask the model two questions, rewind the context back to afte
 ```typescript title="time-travel.ts"
 import { Agent, createOpenAIProvider } from "kenpachi";
 
-const provider = createOpenAIProvider({ apiKey: process.env.OPENAI_API_KEY!, model: "gpt-4o" });
+const provider = createOpenAIProvider({
+  apiKey: process.env.OPENAI_API_KEY!,
+  model: "gpt-4o",
+});
 const agent = new Agent(provider, []);
 
 async function main() {
