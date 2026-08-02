@@ -4,23 +4,22 @@ import { serializeZodSchema } from "../tool.js";
 
 export function formatToolsForOpenAI(tools: any[]) {
     return tools.map((tool) => {
-        const rawSchema = tool.schema || tool.inputSchema;
+        // Extract Zod schema or parameters
+        const rawSchema = tool.schema || tool.inputSchema || tool.parameters;
 
-        let serialized: Record<string, unknown>;
+        let serialized: Record<string, unknown> = {};
+
         if (rawSchema) {
-            serialized = serializeZodSchema(rawSchema);
-        } else if (tool.parameters) {
-            serialized = tool.parameters.properties
-                ? tool.parameters
-                : serializeZodSchema(tool.parameters);
-        } else {
-            serialized = { type: "object", properties: {}, required: [] };
+            // Check if it's already a raw JSON schema or a Zod object
+            serialized = typeof rawSchema._def !== "undefined"
+                ? serializeZodSchema(rawSchema)
+                : rawSchema;
         }
 
         const properties = (serialized.properties as Record<string, unknown>) ?? {};
         const required = (serialized.required as string[]) ?? Object.keys(properties);
 
-        const formatted = {
+        const result = {
             type: "function" as const,
             function: {
                 name: tool.name,
@@ -33,10 +32,10 @@ export function formatToolsForOpenAI(tools: any[]) {
             },
         };
 
-        // 🔍 DEBUG LOG: Uncomment this to print the payload sent to OpenAI
-        // console.log("Formatted OpenAI Tool:", JSON.stringify(formatted, null, 2));
+        // 🚨 ADD THIS DEBUG LOG HERE:
+        console.dir({ TOOL_PAYLOAD_SENT_TO_OPENAI: result }, { depth: null });
 
-        return formatted;
+        return result;
     });
 }
 

@@ -56,30 +56,30 @@ export function serializeZodSchema(schema: any): Record<string, unknown> {
         return { type: "object", properties: {}, required: [] };
     }
 
-    // 1. Force $refStrategy: "none" to keep properties at the root level
-    const rawSchema = zodToJsonSchemaLib(schema, {
-        $refStrategy: "none",
-    }) as Record<string, unknown>;
+    try {
+        // Use target "jsonSchema7" or no target to keep properties strictly at root
+        const rawSchema = zodToJsonSchemaLib(schema, {
+            $refStrategy: "none"
+        }) as Record<string, unknown>;
 
-    // 2. Extract properties with fallback for definition objects
-    const definitions = (rawSchema.definitions ?? {}) as Record<string, any>;
-    const firstDef = Object.values(definitions)[0] as any;
+        // Direct extract
+        const properties = (rawSchema.properties as Record<string, unknown>)
+            ?? (rawSchema as any).definitions?.root?.properties
+            ?? {};
 
-    const properties =
-        (rawSchema.properties as Record<string, unknown>) ??
-        firstDef?.properties ??
-        {};
+        const required = (rawSchema.required as string[])
+            ?? (rawSchema as any).definitions?.root?.required
+            ?? Object.keys(properties);
 
-    const required =
-        (rawSchema.required as string[]) ??
-        firstDef?.required ??
-        Object.keys(properties);
-
-    return {
-        type: "object",
-        properties,
-        ...(required.length > 0 ? { required } : {}),
-    };
+        return {
+            type: "object",
+            properties,
+            ...(required.length > 0 ? { required } : {}),
+        };
+    } catch (e) {
+        console.error("Zod serialization failed:", e);
+        return { type: "object", properties: {}, required: [] };
+    }
 }
 
 /** Convert a Zod schema to a standard JSON schema object for LLM providers. */
