@@ -65,5 +65,8 @@
   },
   "peerDependencies": {
     "zod": "^3.20.0"
+  },
+  "dependencies": {
+    "zod-to-json-schema": "^3.25.2"
   }
 }

@@ -66,3 +66,12 @@ interface ModelProvider {
 ```
 
 If you only implement `createTurn`, streaming still works — text is emitted as a single chunk.
+
+---
+
+## Tool Serialization Across Providers
+
+`kenpachi` automatically maps tool Zod schemas to provider-specific function declarations:
+
+- **Anthropic**: Maps tools to `{ name, description, input_schema: { type: "object", properties, required } }`.
+- **OpenAI**: Maps tools to `{ type: "function", function: { name, description, parameters: { type: "object", properties, required } } }`.

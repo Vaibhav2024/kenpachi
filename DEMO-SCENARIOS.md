@@ -270,6 +270,49 @@ main();
 
 ---
 
+## Scenario 3B — Universal Tool Schema Serializer (Anthropic + OpenAI)
+
+**Story:** *"Zod tool definitions dynamically convert to provider-compliant JSON Schemas (`input_schema` for Anthropic, `parameters` for OpenAI), guaranteeing exact argument mapping without fallback key mismatches."*
+
+**Standalone demo** — `demo-03-anthropic-tools.ts`:
+
+```typescript
+import { z } from "zod";
+import { Agent, defineTool, createAnthropicProvider } from "kenpachi";
+import { createLogger } from "./logger.js";
+
+const apiKey = process.env.ANTHROPIC_API_KEY;
+if (!apiKey) throw new Error("Set ANTHROPIC_API_KEY before running this demo");
+
+const getWeatherForecast = defineTool({
+  name: "get_weather_forecast",
+  description: "Get weather forecast for a city for a specified number of days.",
+  schema: z.object({
+    city: z.string().describe("The target city name"),
+    forecastDays: z.number().describe("Number of forecast days"),
+  }),
+  async execute({ city, forecastDays }) {
+    console.log(`   📡 Fetching ${forecastDays}-day forecast for ${city}…`);
+    return { city, forecastDays, condition: "sunny", tempC: 25 };
+  },
+});
+
+async function main() {
+  console.log("\n=== SCENARIO 3B: Anthropic Dynamic Tool Schema Serializer ===\n");
+  const log = createLogger("anthropic");
+
+  const provider = createAnthropicProvider({ apiKey, model: "claude-3-5-sonnet-20241022" });
+  const agent = new Agent(provider, [getWeatherForecast]);
+  const result = await agent.run("What is the 3-day weather forecast for Tokyo?", { onEvent: log });
+
+  console.log("\n📝 Final answer:", result.text);
+}
+
+main();
+```
+
+---
+
 ## Scenario 4 — Saga Rollback (Booking That Unwinds)
 
 **Story:** *"Reserve seat → charge card. Card declines. Kenpachi rolls back the seat hold automatically."*

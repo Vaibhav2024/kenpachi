@@ -1,4 +1,4 @@
-import type { Message, ModelProvider, ModelTurnResult, StreamChunk } from "../types.js";
+import type { Message, ModelProvider, ModelTurnResult, StreamChunk, ToolSchema } from "../types.js";
 import { parseSSE } from "./sse.js";
 
 export function createOpenAIProvider(opts: { apiKey: string; model: string }): ModelProvider {
@@ -13,14 +13,7 @@ export function createOpenAIProvider(opts: { apiKey: string; model: string }): M
             ];
 
             // 1. Format tools cleanly
-            const formattedTools = tools.map((t) => ({
-                type: "function" as const,
-                function: {
-                    name: t.name,
-                    description: t.description,
-                    parameters: t.parameters,
-                },
-            }));
+            const formattedTools = tools.map(toOpenAITool);
 
             // 2. Build payload - ONLY include `tools` if array is NOT empty
             const bodyPayload: Record<string, unknown> = {
@@ -62,10 +55,7 @@ export function createOpenAIProvider(opts: { apiKey: string; model: string }): M
                 stream: true,
             };
 
-            const formattedTools = tools.map((t) => ({
-                type: "function" as const,
-                function: { name: t.name, description: t.description, parameters: t.parameters },
-            }));
+            const formattedTools = tools.map(toOpenAITool);
 
             if (formattedTools.length > 0) {
                 bodyPayload.tools = formattedTools;
@@ -212,6 +202,25 @@ function fromOpenAIResponse(data: any): ModelTurnResult {
         usage: {
             inputTokens: data.usage?.prompt_tokens ?? 0,
             outputTokens: data.usage?.completion_tokens ?? 0,
+        },
+    };
+}
+
+function toOpenAITool(t: ToolSchema) {
+    const params = t.parameters ?? {};
+    const serializedProperties = (params.properties as Record<string, unknown>) ?? {};
+    const serializedRequired = (params.required as string[]) ?? [];
+
+    return {
+        type: "function" as const,
+        function: {
+            name: t.name,
+            description: t.description,
+            parameters: {
+                type: "object" as const,
+                properties: serializedProperties,
+                ...(serializedRequired.length > 0 ? { required: serializedRequired } : {}),
+            },
         },
     };
 }

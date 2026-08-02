@@ -52,3 +52,22 @@ The `execute` function receives a `ToolContext` instance as its second argument:
 <ResponseField name="registerCompensation" type="(undo: () => Promise<void>) => void">
   Function used to register a compensating action executed if a later tool call in the same batch fails.
 </ResponseField>
+
+---
+
+## Schema Serialization
+
+kenpachi includes a universal Zod schema serializer `serializeZodSchema(schema: z.ZodTypeAny)` that transforms any Zod definition into a standard JSON Schema object (`type: "object"`, `properties`, `required`), automatically stripping non-standard fields (like `$schema`) for LLM provider compliance:
+
+```typescript
+import { serializeZodSchema } from "kenpachi";
+import { z } from "zod";
+
+const jsonSchema = serializeZodSchema(
+  z.object({
+    city: z.string(),
+    forecastDays: z.number(),
+  })
+);
+// Output: { type: "object", properties: { city: { type: "string" }, forecastDays: { type: "number" } }, required: ["city", "forecastDays"] }
+```

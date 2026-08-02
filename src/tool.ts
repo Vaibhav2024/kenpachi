@@ -1,5 +1,6 @@
 // src/tool.ts
-import { Schema, z } from "zod";
+import { z } from "zod";
+import { zodToJsonSchema as zodToJsonSchemaLib } from "zod-to-json-schema";
 import type { ToolSchema } from "./types.js";
 
 export interface ToolContext {
@@ -46,79 +47,40 @@ export function defineTool<Args, Result>(def: {
     }
 }
 
-/** Convert a Zod schema to a JSON-schema-ish object good enough for prompting. */
-export function zodToJsonSchema(schema: z.ZodType<any>): Record<string, unknown> {
-    const def = (schema as any)._def;
+/**
+ * Universal Zod schema serializer converting ZodType into standard JSON Schema object.
+ * Strips non-standard outer fields like $schema.
+ */
+export function serializeZodSchema(schema: z.ZodTypeAny): Record<string, unknown> {
+    if (!schema) {
+        return { type: "object", properties: {} };
+    }
+
+    const rawSchema = zodToJsonSchemaLib(schema, { target: "openAi" }) as Record<string, unknown>;
+
+    // Strip non-standard outer fields like $schema
+    const { $schema, ...cleanSchema } = rawSchema;
+
+    const properties = (cleanSchema.properties as Record<string, unknown>) ?? {};
+    const required = (cleanSchema.required as string[]) ?? [];
+
     return {
         type: "object",
-        properties: {
-            expression: {
-                type: "string",
-                description: "The mathematical expression to evaluate, e.g. (14 * 3) + 7"
-            }
-        },
-        required: ["expression"]
+        properties,
+        ...(Array.isArray(required) && required.length > 0 ? { required } : {}),
+        ...cleanSchema,
     };
 }
 
-function zodDefToJsonSchema(def: any): Record<string, unknown> {
-    if (!def) return { type: "object", properties: {} };
-
-    const typeName = def.typeName;
-
-    switch (typeName) {
-        case "ZodObject": {
-            // Support both Zod v3 property shape and method shape
-            const rawShape = typeof def.shape === "function" ? def.shape() : def.shape;
-            const shape = rawShape ?? {};
-
-            const properties: Record<string, unknown> = {};
-            const required: string[] = [];
-
-            for (const key of Object.keys(shape)) {
-                const field = shape[key];
-                if (!field) continue;
-
-                const fieldDef = field._def;
-                if (!fieldDef) continue;
-
-                properties[key] = zodDefToJsonSchema(fieldDef);
-
-                // Mark required if it is NOT optional or defaulted
-                const isOptional = fieldDef.typeName === "ZodOptional" || fieldDef.typeName === "ZodDefault";
-                if (!isOptional) {
-                    required.push(key);
-                }
-            }
-
-            return {
-                type: "object",
-                properties,
-                ...(required.length > 0 ? { required } : {}),
-            };
-        }
-        case "ZodString":
-            return { type: "string", ...(def.description ? { description: def.description } : {}) };
-        case "ZodNumber":
-            return { type: "number" };
-        case "ZodBoolean":
-            return { type: "boolean" };
-        case "ZodArray":
-            return { type: "array", items: zodDefToJsonSchema(def.type?._def) };
-        case "ZodEnum":
-            return { type: "string", enum: def.values };
-        case "ZodOptional":
-        case "ZodDefault":
-            return zodDefToJsonSchema(def.innerType?._def);
-        default:
-            return { type: "string" };
-    }
+/** Convert a Zod schema to a standard JSON schema object for LLM providers. */
+export function zodToJsonSchema(schema: z.ZodType<any>): Record<string, unknown> {
+    return serializeZodSchema(schema);
 }
 
 export function toToolSchema(tool: Tool): ToolSchema {
     return {
         name: tool.name,
         description: tool.description,
-        parameters: zodToJsonSchema(tool.schema),
+        parameters: serializeZodSchema(tool.schema),
     };
-}
+}

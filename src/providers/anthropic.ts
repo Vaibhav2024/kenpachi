@@ -147,7 +147,19 @@ function toAnthropicMessage(m: Message) {
 }
 
 function toAnthropicTool(t: ToolSchema) {
-    return { name: t.name, description: t.description, input_schema: t.parameters }
+    const params = t.parameters ?? {};
+    const serializedProperties = (params.properties as Record<string, unknown>) ?? {};
+    const serializedRequired = (params.required as string[]) ?? [];
+
+    return {
+        name: t.name,
+        description: t.description,
+        input_schema: {
+            type: "object" as const,
+            properties: serializedProperties,
+            ...(serializedRequired.length > 0 ? { required: serializedRequired } : {}),
+        },
+    };
 }
 
 function fromAnthropicResponse(data: any): ModelTurnResult {
