@@ -4,22 +4,39 @@ import { serializeZodSchema } from "../tool.js";
 
 export function formatToolsForOpenAI(tools: any[]) {
     return tools.map((tool) => {
-        // If it's a kenpachi Tool object, serialize tool.schema; otherwise handle ToolSchema
-        const schemaObj = tool.schema || tool.inputSchema;
-        const serialized = schemaObj 
-            ? serializeZodSchema(schemaObj)
-            : (tool.parameters?.properties 
-                ? tool.parameters 
-                : (tool.parameters ? serializeZodSchema(tool.parameters) : { type: "object", properties: {}, required: [] }));
+        const rawSchema = tool.schema || tool.inputSchema;
 
-        return {
+        let serialized: Record<string, unknown>;
+        if (rawSchema) {
+            serialized = serializeZodSchema(rawSchema);
+        } else if (tool.parameters) {
+            serialized = tool.parameters.properties
+                ? tool.parameters
+                : serializeZodSchema(tool.parameters);
+        } else {
+            serialized = { type: "object", properties: {}, required: [] };
+        }
+
+        const properties = (serialized.properties as Record<string, unknown>) ?? {};
+        const required = (serialized.required as string[]) ?? Object.keys(properties);
+
+        const formatted = {
             type: "function" as const,
             function: {
                 name: tool.name,
                 description: tool.description,
-                parameters: serialized,
+                parameters: {
+                    type: "object" as const,
+                    properties,
+                    ...(required.length > 0 ? { required } : {}),
+                },
             },
         };
+
+        // 🔍 DEBUG LOG: Uncomment this to print the payload sent to OpenAI
+        // console.log("Formatted OpenAI Tool:", JSON.stringify(formatted, null, 2));
+
+        return formatted;
     });
 }
 
@@ -209,8 +226,8 @@ function fromOpenAIResponse(data: any): ModelTurnResult {
     for (const call of msg.tool_calls ?? []) {
         let parsedArgs = {};
         try {
-            parsedArgs = typeof call.function.arguments === "string" 
-                ? JSON.parse(call.function.arguments) 
+            parsedArgs = typeof call.function.arguments === "string"
+                ? JSON.parse(call.function.arguments)
                 : call.function.arguments;
         } catch {
             parsedArgs = {};

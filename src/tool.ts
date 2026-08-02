@@ -56,23 +56,23 @@ export function serializeZodSchema(schema: any): Record<string, unknown> {
         return { type: "object", properties: {}, required: [] };
     }
 
-    // 1. Convert Zod schema without $ref wrapping
+    // 1. Force $refStrategy: "none" to keep properties at the root level
     const rawSchema = zodToJsonSchemaLib(schema, {
         $refStrategy: "none",
     }) as Record<string, unknown>;
 
-    // Safely extract definitions object with type casting
+    // 2. Extract properties with fallback for definition objects
     const definitions = (rawSchema.definitions ?? {}) as Record<string, any>;
+    const firstDef = Object.values(definitions)[0] as any;
 
-    // 2. Safely extract properties & required array from top level OR definitions.root
     const properties =
         (rawSchema.properties as Record<string, unknown>) ??
-        definitions.root?.properties ??
+        firstDef?.properties ??
         {};
 
     const required =
         (rawSchema.required as string[]) ??
-        definitions.root?.required ??
+        firstDef?.required ??
         Object.keys(properties);
 
     return {
