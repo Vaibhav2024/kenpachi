@@ -6,6 +6,12 @@ import { defineTool } from "../src/tool.js";
 import { createScriptedProvider, textTurn, toolCallTurn } from "./fakes.js";
 
 describe("Agent.run", () => {
+    it("can be initialized without providing a tool list", () => {
+        const provider = createScriptedProvider([textTurn("Hello there!")]);
+        const agent = new Agent(provider);
+        expect(agent.getTools()).toEqual([]);
+    });
+
     it("returns the final text turn when the model calls no tools", async () => {
         const provider = createScriptedProvider([textTurn("Hello there!")]);
         const agent = new Agent(provider, []);

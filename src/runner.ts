@@ -20,7 +20,7 @@ export class Agent {
 
   constructor(
     private readonly provider: ModelProvider,
-    toolList: Tool[],
+    toolList: Tool[] = [],
     public readonly context: AgentContext = new AgentContext()
   ) {
     this.tools = new Map(toolList.map((t) => [t.name, t]));
