@@ -21,6 +21,7 @@ import { Agent, defineTool, handoff, createAnthropicProvider } from "kenpachi";
 
 const provider = createAnthropicProvider({
   apiKey: process.env.ANTHROPIC_API_KEY!,
+  model: "claude-sonnet-4-6",
 });
 
 // Specialist: billing — no tools needed for simple Q&A

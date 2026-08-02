@@ -32,7 +32,7 @@ describe("Anthropic Provider", () => {
             json: async () => mockResponse,
         });
 
-        const provider = createAnthropicProvider({ apiKey: "fake-key" });
+        const provider = createAnthropicProvider({ apiKey: "fake-key", model: "claude-sonnet-4-6" });
 
         // 2. Execute createTurn
         const result = await provider.createTurn({
@@ -87,7 +87,7 @@ describe("Anthropic Provider", () => {
             json: async () => mockToolUseResponse,
         });
 
-        const provider = createAnthropicProvider({ apiKey: "fake-key" });
+        const provider = createAnthropicProvider({ apiKey: "fake-key", model: "claude-sonnet-4-6" });
         const result = await provider.createTurn({
             messages: [{ role: "user", content: [{ type: "text", text: "Weather in Nashik?" }] }],
             tools: [],

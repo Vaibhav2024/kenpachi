@@ -84,7 +84,7 @@ const pricingTool = synthesizeTool(
 );
 
 // 2. Attach the tool to a kenpachi Agent
-const provider = createOpenAIProvider({ apiKey: process.env.OPENAI_API_KEY! });
+const provider = createOpenAIProvider({ apiKey: process.env.OPENAI_API_KEY!, model: "gpt-4o" });
 const agent = new Agent(provider, [pricingTool]);
 
 // 3. Run the Agent (This triggers the LLM call)

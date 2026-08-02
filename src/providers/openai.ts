@@ -1,8 +1,8 @@
 import type { Message, ModelProvider, ModelTurnResult, StreamChunk } from "../types.js";
 import { parseSSE } from "./sse.js";
 
-export function createOpenAIProvider(opts: { apiKey: string; model?: string }): ModelProvider {
-    const model = opts.model ?? "gpt-4o-mini";
+export function createOpenAIProvider(opts: { apiKey: string; model: string }): ModelProvider {
+    const model = opts.model;
 
     return {
         name: "openai",

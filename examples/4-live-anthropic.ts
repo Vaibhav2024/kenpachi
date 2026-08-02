@@ -18,7 +18,7 @@ async function main() {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error("Set OPENAI_API_KEY in your environment to run this example");
 
-  const provider = createOpenAIProvider({ apiKey });
+  const provider = createOpenAIProvider({ apiKey, model: "gpt-4o-mini" });
   const agent = new Agent(provider, [calculate]);
 
   console.log("Sending live request to OpenAI...");

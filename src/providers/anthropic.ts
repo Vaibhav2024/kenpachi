@@ -3,9 +3,9 @@ import { parseSSE } from "./sse.js";
 
 export function createAnthropicProvider(opts: {
     apiKey: string;
-    model?: string;
+    model: string;
 }): ModelProvider {
-    const model = opts.model ?? "claude-sonnet-4-6";
+    const model = opts.model;
 
     return {
         name: "anthropic",

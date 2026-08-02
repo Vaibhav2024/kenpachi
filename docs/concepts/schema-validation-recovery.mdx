@@ -40,7 +40,7 @@ const multiply = defineTool({
 });
 
 const agent = new Agent(
-  createOpenAIProvider({ apiKey: process.env.OPENAI_API_KEY! }),
+  createOpenAIProvider({ apiKey: process.env.OPENAI_API_KEY!, model: "gpt-4o" }),
   [multiply]
 );
 

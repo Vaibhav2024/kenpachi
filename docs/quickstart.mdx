@@ -13,7 +13,7 @@ This guide covers the three patterns you'll use most: plain chat, tools, and str
 import { Agent, createAnthropicProvider } from "kenpachi";
 
 const agent = new Agent(
-  createAnthropicProvider({ apiKey: process.env.ANTHROPIC_API_KEY! }),
+  createAnthropicProvider({ apiKey: process.env.ANTHROPIC_API_KEY!, model: "claude-sonnet-4-6" }),
   []
 );
 
@@ -46,7 +46,7 @@ const getWeather = defineTool({
 });
 
 const agent = new Agent(
-  createAnthropicProvider({ apiKey: process.env.ANTHROPIC_API_KEY! }),
+  createAnthropicProvider({ apiKey: process.env.ANTHROPIC_API_KEY!, model: "claude-sonnet-4-6" }),
   [getWeather]
 );
 
