@@ -34,7 +34,7 @@ export interface Tool<Args = any, Result = any> {
 export function defineTool<Args, Result>(def: {
     name: string;
     description: string;
-    schema: z.ZodType<Args>;
+    schema: any;
     execute(args: Args, ctx: ToolContext): Promise<Result>;
     repairable?: boolean;
 }): Tool<Args, Result> {
@@ -56,20 +56,55 @@ export function serializeZodSchema(schema: any): Record<string, unknown> {
         return { type: "object", properties: {}, required: [] };
     }
 
-    // 1. Direct Zod Shape Extraction (Bulletproof Fallback)
-    // If schema is a ZodObject, manually extract key properties
-    let properties: Record<string, any> = {};
-    let required: string[] = [];
+    // 1. Primary Strategy: Try zod-to-json-schema first (cleanest output for Anthropic & OpenAI)
+    try {
+        const raw = zodToJsonSchemaLib(schema, {
+            $refStrategy: "none",
+            target: "jsonSchema7",
+        }) as any;
 
-    const shape = schema.shape || schema._def?.shape?.();
+        const properties =
+            raw.properties ||
+            raw.definitions?.root?.properties ||
+            (Object.values(raw.definitions || {})[0] as any)?.properties;
 
-    if (shape) {
-        for (const [key, value] of Object.entries(shape)) {
-            const isOptional = (value as any)?._def?.typeName === "ZodOptional";
-            properties[key] = {
-                type: "string", // standard default fallback
-                description: (value as any)?.description || key,
+        if (properties && Object.keys(properties).length > 0) {
+            const required =
+                raw.required ||
+                raw.definitions?.root?.required ||
+                (Object.values(raw.definitions || {})[0] as any)?.required ||
+                Object.keys(properties);
+
+            // Strip internal JSON Schema metadata so Anthropic/OpenAI accept it cleanly
+            delete raw.$schema;
+            delete raw.definitions;
+
+            return {
+                type: "object",
+                properties,
+                ...(required.length > 0 ? { required } : {}),
             };
+        }
+    } catch (err) {
+        // Fall back to shape inspection if library fails
+    }
+
+    // 2. Secondary Strategy: Direct Zod Shape Inspection with dynamic types
+    const shape = schema.shape || schema._def?.shape?.();
+    if (shape) {
+        const properties: Record<string, any> = {};
+        const required: string[] = [];
+
+        for (const [key, value] of Object.entries(shape)) {
+            const valAny = value as any;
+            const typeName = valAny?._def?.typeName;
+            const isOptional = typeName === "ZodOptional";
+
+            properties[key] = {
+                type: getJsonSchemaType(valAny), // 👈 Dynamically determines "string", "number", "boolean", etc.
+                description: valAny?.description || valAny?._def?.description || key,
+            };
+
             if (!isOptional) {
                 required.push(key);
             }
@@ -82,20 +117,7 @@ export function serializeZodSchema(schema: any): Record<string, unknown> {
         };
     }
 
-    // 2. Standard zod-to-json-schema fallback if shape extraction didn't match
-    try {
-        const raw = zodToJsonSchemaLib(schema, { $refStrategy: "none" }) as any;
-        const props = raw.properties || raw.definitions?.root?.properties || {};
-        const req = raw.required || raw.definitions?.root?.required || Object.keys(props);
-        return {
-            type: "object",
-            properties: props,
-            ...(req.length > 0 ? { required: req } : {}),
-        };
-    } catch (err) {
-        console.error("Failed to serialize schema:", err);
-        return { type: "object", properties: {}, required: [] };
-    }
+    return { type: "object", properties: {}, required: [] };
 }
 
 /** Convert a Zod schema to a standard JSON schema object for LLM providers. */
@@ -109,4 +131,19 @@ export function toToolSchema(tool: Tool): ToolSchema {
         description: tool.description,
         parameters: serializeZodSchema(tool.schema),
     };
+}
+
+function getJsonSchemaType(zodType: any): string {
+    const typeName = zodType?._def?.typeName || "";
+
+    // Unwrap optional / nullable schemas
+    if (typeName === "ZodOptional" || typeName === "ZodNullable") {
+        return getJsonSchemaType(zodType._def.innerType);
+    }
+    if (typeName === "ZodNumber") return "number";
+    if (typeName === "ZodBoolean") return "boolean";
+    if (typeName === "ZodArray") return "array";
+    if (typeName === "ZodObject") return "object";
+
+    return "string"; // Default fallback
 }
