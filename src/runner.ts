@@ -216,7 +216,9 @@ export class Agent {
     emit: (e: AgentEvent) => void
   ): Promise<{ ok: true; result: unknown; undo?: () => Promise<void> } | { ok: false; error: string }> {
     let attempt = 0;
-    let currentArgs = rawArgs;
+
+    // ⚡ FIX: Pre-coerce arguments BEFORE running safeParse for the first time!
+    let currentArgs = tryCoerce(rawArgs);
 
     while (attempt <= maxAttempts) {
       const parsed = tool.schema.safeParse(currentArgs);
@@ -227,6 +229,8 @@ export class Agent {
           return { ok: false, error: `Invalid arguments after ${attempt} repair attempt(s): ${errorText}` };
         }
         emit({ type: "tool_repair_attempt", name: tool.name, attempt: attempt + 1, error: errorText });
+
+        // Secondary attempt coercion (if repair loop continues)
         currentArgs = tryCoerce(currentArgs);
         attempt++;
         continue;
