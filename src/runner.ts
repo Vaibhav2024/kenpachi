@@ -2,7 +2,7 @@
 import { z } from "zod";
 import type { AgentEvent, AgentRunOptions, Message, ModelProvider, ModelTurnResult } from "./types.js";
 import { AgentContext } from "./context.js";
-import { toToolSchema, type Tool, type ToolContext } from "./tool.js";
+import { toToolSchema, tryCoerce, type Tool, type ToolContext } from "./tool.js";
 
 export interface AgentRunResult {
   /** Plain text string extracted from the assistant's final response. */
@@ -217,8 +217,18 @@ export class Agent {
   ): Promise<{ ok: true; result: unknown; undo?: () => Promise<void> } | { ok: false; error: string }> {
     let attempt = 0;
 
-    // ⚡ FIX: Pre-coerce arguments BEFORE running safeParse for the first time!
-    let currentArgs = tryCoerce(rawArgs);
+    // 1. If rawArgs is a stringified JSON string from an LLM stream, parse it first
+    let currentArgs = rawArgs;
+    if (typeof currentArgs === "string") {
+      try {
+        currentArgs = JSON.parse(currentArgs);
+      } catch {
+        // keep rawArgs as is
+      }
+    }
+
+    // 2. Pre-coerce numeric/boolean strings ("50" -> 50, "true" -> true) BEFORE safeParse
+    currentArgs = tryCoerce(currentArgs);
 
     while (attempt <= maxAttempts) {
       const parsed = tool.schema.safeParse(currentArgs);
@@ -228,9 +238,11 @@ export class Agent {
         if (!tool.repairable || attempt === maxAttempts) {
           return { ok: false, error: `Invalid arguments after ${attempt} repair attempt(s): ${errorText}` };
         }
+
+        // ⚡ Emit repair event for the self-healing test assertions
         emit({ type: "tool_repair_attempt", name: tool.name, attempt: attempt + 1, error: errorText });
 
-        // Secondary attempt coercion (if repair loop continues)
+        // Coerce numeric-strings ("42" -> 42) for the retry attempt
         currentArgs = tryCoerce(currentArgs);
         attempt++;
         continue;
@@ -263,14 +275,3 @@ function formatZodError(error: z.ZodError): string {
   return error.issues.map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`).join("; ");
 }
 
-function tryCoerce(args: unknown): unknown {
-  if (typeof args !== "object" || args === null) return args;
-  const copy: Record<string, unknown> = { ...(args as Record<string, unknown>) };
-  for (const key of Object.keys(copy)) {
-    const value = copy[key];
-    if (typeof value === "string" && /^-?\d+(\.\d+)?$/.test(value)) {
-      copy[key] = Number(value);
-    }
-  }
-  return copy;
-}

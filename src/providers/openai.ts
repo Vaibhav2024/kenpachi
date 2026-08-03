@@ -17,9 +17,9 @@ export function formatToolsForOpenAI(tools: any[]) {
         }
 
         const properties = (serialized.properties as Record<string, unknown>) ?? {};
-        const required = (serialized.required as string[]) ?? Object.keys(properties);
+        const required = (serialized.required as string[]) ?? [];
 
-        const result = {
+        return {
             type: "function" as const,
             function: {
                 name: tool.name,
@@ -31,11 +31,6 @@ export function formatToolsForOpenAI(tools: any[]) {
                 },
             },
         };
-
-        // 🚨 ADD THIS DEBUG LOG HERE:
-        console.dir({ TOOL_PAYLOAD_SENT_TO_OPENAI: result }, { depth: null });
-
-        return result;
     });
 }
 

@@ -56,6 +56,14 @@ export function serializeZodSchema(schema: any): Record<string, unknown> {
         return { type: "object", properties: {}, required: [] };
     }
 
+    // 0. If schema is already a raw JSON schema object (no Zod _def property)
+    if (typeof schema === "object" && !schema._def && (schema.properties || schema.type)) {
+        const clean: Record<string, unknown> = { ...schema };
+        delete clean.$schema;
+        delete clean.definitions;
+        return clean;
+    }
+
     // 1. Primary Strategy: Try zod-to-json-schema first (cleanest output for Anthropic & OpenAI)
     try {
         const raw = zodToJsonSchemaLib(schema, {
@@ -63,45 +71,77 @@ export function serializeZodSchema(schema: any): Record<string, unknown> {
             target: "jsonSchema7",
         }) as any;
 
-        const properties =
-            raw.properties ||
-            raw.definitions?.root?.properties ||
-            (Object.values(raw.definitions || {})[0] as any)?.properties;
-
-        if (properties && Object.keys(properties).length > 0) {
-            const required =
-                raw.required ||
-                raw.definitions?.root?.required ||
-                (Object.values(raw.definitions || {})[0] as any)?.required ||
-                Object.keys(properties);
-
-            // Strip internal JSON Schema metadata so Anthropic/OpenAI accept it cleanly
+        if (raw && typeof raw === "object") {
             delete raw.$schema;
             delete raw.definitions;
 
-            return {
-                type: "object",
-                properties,
-                ...(required.length > 0 ? { required } : {}),
-            };
+            const properties =
+                raw.properties ||
+                raw.definitions?.root?.properties ||
+                (raw.definitions && (Object.values(raw.definitions)[0] as any)?.properties);
+
+            if (properties) {
+                const required =
+                    raw.required ||
+                    raw.definitions?.root?.required ||
+                    (raw.definitions && (Object.values(raw.definitions)[0] as any)?.required) ||
+                    [];
+
+                return {
+                    type: "object",
+                    properties,
+                    ...(Array.isArray(required) && required.length > 0 ? { required } : {}),
+                };
+            }
         }
     } catch (err) {
         // Fall back to shape inspection if library fails
     }
 
     // 2. Secondary Strategy: Direct Zod Shape Inspection with dynamic types
-    const shape = schema.shape || schema._def?.shape?.();
-    if (shape) {
+    let targetSchema = schema;
+    while (targetSchema && targetSchema._def) {
+        const typeName = targetSchema._def.typeName;
+        if (targetSchema.shape || targetSchema._def.shape) break;
+        if (typeName === "ZodOptional" || typeName === "ZodNullable" || typeName === "ZodDefault" || typeName === "ZodCatch" || typeName === "ZodReadonly") {
+            targetSchema = targetSchema._def.innerType;
+        } else if (typeName === "ZodEffects") {
+            targetSchema = targetSchema._def.schema;
+        } else if (typeName === "ZodPipeline") {
+            targetSchema = targetSchema._def.out || targetSchema._def.in;
+        } else {
+            break;
+        }
+    }
+
+    const shape = targetSchema?.shape || (typeof targetSchema?._def?.shape === "function" ? targetSchema._def.shape() : targetSchema?._def?.shape);
+    if (shape && typeof shape === "object") {
         const properties: Record<string, any> = {};
         const required: string[] = [];
 
         for (const [key, value] of Object.entries(shape)) {
             const valAny = value as any;
-            const typeName = valAny?._def?.typeName;
-            const isOptional = typeName === "ZodOptional";
+            
+            // Check if property is optional
+            let isOptional = false;
+            let currentVal = valAny;
+            while (currentVal && currentVal._def) {
+                const tName = currentVal._def.typeName;
+                if (tName === "ZodOptional") {
+                    isOptional = true;
+                    break;
+                }
+                if (tName === "ZodDefault" || tName === "ZodNullable" || tName === "ZodReadonly" || tName === "ZodCatch") {
+                    currentVal = currentVal._def.innerType;
+                } else if (tName === "ZodEffects") {
+                    currentVal = currentVal._def.schema;
+                } else {
+                    break;
+                }
+            }
 
             properties[key] = {
-                type: getJsonSchemaType(valAny), // 👈 Dynamically determines "string", "number", "boolean", etc.
+                type: getJsonSchemaType(valAny),
                 description: valAny?.description || valAny?._def?.description || key,
             };
 
@@ -133,17 +173,54 @@ export function toToolSchema(tool: Tool): ToolSchema {
     };
 }
 
-function getJsonSchemaType(zodType: any): string {
-    const typeName = zodType?._def?.typeName || "";
+export function getJsonSchemaType(zodType: any): string {
+    if (!zodType || typeof zodType !== "object") return "string";
 
-    // Unwrap optional / nullable schemas
-    if (typeName === "ZodOptional" || typeName === "ZodNullable") {
-        return getJsonSchemaType(zodType._def.innerType);
+    // Recursively unwrap schema wrappers (Optional, Nullable, Default, Effects, Catch, Readonly, Pipeline, etc.)
+    let current = zodType;
+    while (current && current._def) {
+        const typeName = current._def.typeName;
+        if (typeName === "ZodOptional" || typeName === "ZodNullable" || typeName === "ZodDefault" || typeName === "ZodCatch" || typeName === "ZodReadonly") {
+            current = current._def.innerType;
+        } else if (typeName === "ZodEffects") {
+            current = current._def.schema;
+        } else if (typeName === "ZodPipeline") {
+            current = current._def.out || current._def.in;
+        } else {
+            break;
+        }
     }
+
+    const typeName = current?._def?.typeName || "";
     if (typeName === "ZodNumber") return "number";
     if (typeName === "ZodBoolean") return "boolean";
     if (typeName === "ZodArray") return "array";
     if (typeName === "ZodObject") return "object";
+    if (typeName === "ZodString") return "string";
 
     return "string"; // Default fallback
 }
+
+/**
+ * Coerces numeric strings ("50" -> 50) and boolean strings ("true" -> true) recursively into JS primitives.
+ */
+export function tryCoerce(args: unknown): unknown {
+    if (typeof args === "string") {
+        if (args === "true") return true;
+        if (args === "false") return false;
+        if (/^-?\d+(\.\d+)?$/.test(args)) return Number(args);
+        return args;
+    }
+    if (Array.isArray(args)) {
+        return args.map(tryCoerce);
+    }
+    if (typeof args === "object" && args !== null) {
+        const copy: Record<string, unknown> = {};
+        for (const [key, value] of Object.entries(args)) {
+            copy[key] = tryCoerce(value);
+        }
+        return copy;
+    }
+    return args;
+}
+

@@ -24,8 +24,9 @@ describe("self-healing tool loop", () => {
         const result = await agent.run("double 21", { onEvent: (e) => events.push(e), maxToolRepairAttempts: 2 });
 
         expect(result.content[0]).toEqual({ type: "text", text: "42" });
+        // Pre-coercion fixes numeric strings ("21" -> 21) on attempt 0 before safeParse
         const repairEvent = events.find((e) => e.type === "tool_repair_attempt");
-        expect(repairEvent).toBeDefined();
+        expect(repairEvent).toBeUndefined();
     });
 
     it("surfaces an error result after exhausting repair attempts on truly bad args", async () => {

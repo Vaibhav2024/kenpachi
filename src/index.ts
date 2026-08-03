@@ -4,7 +4,7 @@ export type { AgentRunResult } from "./runner.js";
 export { createHandoff, handoff } from "./handoff.js";
 export type { HandoffOptions, HandoffContextMode } from "./handoff.js";
 export { AgentContext } from "./context.js";
-export { defineTool, toToolSchema, zodToJsonSchema, serializeZodSchema } from "./tool.js";
+export { defineTool, toToolSchema, zodToJsonSchema, serializeZodSchema, tryCoerce } from "./tool.js";
 export type { Tool, ToolContext } from "./tool.js";
 
 export { createAnthropicProvider, formatToolsForAnthropic } from "./providers/anthropic.js";
