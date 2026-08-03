@@ -66,6 +66,6 @@ describe("createHandoff", () => {
 
         await parentAgent.run("first message", {});
 
-        expect(seenMessageCount).toBe(3);
+        expect(seenMessageCount).toBe(4);
     });
 });

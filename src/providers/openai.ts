@@ -40,10 +40,10 @@ export function createOpenAIProvider(opts: { apiKey: string; model: string }): M
     return {
         name: "openai",
         async createTurn({ system, messages, tools }): Promise<ModelTurnResult> {
-            const chatMessages = [
+            const chatMessages = sanitizeOpenAIMessages([
                 ...(system ? [{ role: "system", content: system }] : []),
                 ...messages.flatMap(toOpenAIMessages),
-            ];
+            ]);
 
             // 1. Format tools cleanly
             const formattedTools = formatToolsForOpenAI(tools);
@@ -80,10 +80,10 @@ export function createOpenAIProvider(opts: { apiKey: string; model: string }): M
         },
 
         async *streamTurn({ system, messages, tools }): AsyncGenerator<StreamChunk, void, unknown> {
-            const chatMessages = [
+            const chatMessages = sanitizeOpenAIMessages([
                 ...(system ? [{ role: "system", content: system }] : []),
                 ...messages.flatMap(toOpenAIMessages),
-            ];
+            ]);
 
             const bodyPayload: Record<string, unknown> = {
                 model,
@@ -244,3 +244,35 @@ function fromOpenAIResponse(data: any): ModelTurnResult {
         },
     };
 }
+
+export function sanitizeOpenAIMessages(messages: any[]): any[] {
+    const result: any[] = [];
+
+    for (let i = 0; i < messages.length; i++) {
+        const msg = messages[i];
+        result.push(msg);
+
+        if (msg.role === "assistant" && Array.isArray(msg.tool_calls) && msg.tool_calls.length > 0) {
+            const expectedIds = new Set(msg.tool_calls.map((tc: any) => tc.id));
+
+            let j = i + 1;
+            while (j < messages.length && messages[j].role === "tool") {
+                expectedIds.delete(messages[j].tool_call_id);
+                j++;
+            }
+
+            if (expectedIds.size > 0) {
+                for (const missingId of expectedIds) {
+                    const tc = msg.tool_calls.find((c: any) => c.id === missingId);
+                    result.push({
+                        role: "tool",
+                        tool_call_id: missingId,
+                        content: JSON.stringify({ status: "transferred", tool: tc?.function?.name || "handoff" }),
+                    });
+                }
+            }
+        }
+    }
+
+    return result;
+}

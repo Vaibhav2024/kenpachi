@@ -74,18 +74,63 @@ function slugify(text: string): string {
 function buildSeedMessages(mode: HandoffContextMode, parentMessages: Message[]): Message[] {
   if (mode === "none" || parentMessages.length === 0) return [];
 
+  let messages: Message[] = [];
+
   if (mode === "full") {
-    return parentMessages.map((m) => structuredClone(m));
+    messages = parentMessages.map((m) => structuredClone(m));
+  } else {
+    const lines = parentMessages
+      .flatMap((m) =>
+        m.content
+          .filter((b): b is Extract<typeof b, { type: "text" }> => b.type === "text")
+          .map((b) => `${m.role}: ${b.text}`)
+      )
+      .slice(-6);
+
+    if (lines.length > 0) {
+      messages = [{ role: "user", content: [{ type: "text", text: `Context from the prior conversation:\n${lines.join("\n")}` }] }];
+    }
   }
 
-  const lines = parentMessages
-    .flatMap((m) =>
-      m.content
-        .filter((b): b is Extract<typeof b, { type: "text" }> => b.type === "text")
-        .map((b) => `${m.role}: ${b.text}`)
-    )
-    .slice(-6);
-
-  if (lines.length === 0) return [];
-  return [{ role: "user", content: [{ type: "text", text: `Context from the prior conversation:\n${lines.join("\n")}` }] }];
+  return resolvePendingToolCalls(messages);
 }
+
+function resolvePendingToolCalls(messages: Message[]): Message[] {
+  const result: Message[] = [];
+
+  for (let i = 0; i < messages.length; i++) {
+    const m = messages[i];
+    result.push(m);
+
+    if (m.role === "assistant") {
+      const toolCalls = m.content.filter((b): b is Extract<typeof b, { type: "tool_call" }> => b.type === "tool_call");
+      if (toolCalls.length > 0) {
+        const nextMsg = messages[i + 1];
+        const existingToolResultIds = new Set(
+          nextMsg?.role === "tool"
+            ? nextMsg.content
+                .filter((b): b is Extract<typeof b, { type: "tool_result" }> => b.type === "tool_result")
+                .map((b) => b.toolCallId)
+            : []
+        );
+
+        const unresponded = toolCalls.filter((tc) => !existingToolResultIds.has(tc.id));
+        if (unresponded.length > 0) {
+          result.push({
+            role: "tool",
+            content: unresponded.map((tc) => ({
+              type: "tool_result",
+              toolCallId: tc.id,
+              name: tc.name,
+              result: JSON.stringify({ status: "transferred", task: tc.arguments }),
+              isError: false,
+            })),
+          });
+        }
+      }
+    }
+  }
+
+  return result;
+}
+
