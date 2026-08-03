@@ -1,24 +1,22 @@
 ---
-title: "Schema Validation Recovery"
-description: "Automatically recover from malformed tool arguments emitted by models."
+title: "Schema Validation & Argument Coercion"
+description: "Automatically serialize Zod schemas and pre-coerce argument types."
 ---
 
-Models sometimes send `"42"` when your schema expects `42`. Without handling, that throws and kills the whole run. kenpachi catches validation failures, tries to fix them, and only gives up after configurable retries.
+Models sometimes send stringified numbers or booleans like `"42"` or `"true"` when your schema expects primitive numbers or booleans. `kenpachi` automatically pre-coerces these primitive argument types before validating arguments with Zod.
 
 <Tip>
-This is on by default for every `defineTool` (`repairable: true`). You don't opt in — it just works.
+Argument pre-coercion is enabled by default for every tool defined with `defineTool`.
 </Tip>
 
 ---
 
 ## What happens step by step
 
-1. **Serialize** — Tool Zod schemas are dynamically converted to JSON Schema (`type: "object"`, `properties`, `required`) using `serializeZodSchema` so the model receives exact parameter keys.
-2. **Validate** — Arguments sent back by the model are checked with `schema.safeParse()`.
-3. **Coerce** — Simple fixes (e.g. `"6"` → `6`) are applied automatically.
-4. **Retry or inform** — If still invalid, the formatted error is returned to the model as a tool error so it can try again with corrected args.
-
-You'll see `tool_repair_attempt` events if you use `onEvent` or `stream()`.
+1. **Serialize** — Tool Zod schemas are dynamically converted to standard JSON Schema (`type: "object"`, `properties`, `required`) using `serializeZodSchema` so the model receives clean parameter declarations.
+2. **Pre-Coerce** — Incoming arguments are pre-coerced (e.g. `"6"` → `6`, `"true"` → `true`) before schema parsing runs.
+3. **Validate** — Coerced arguments are checked against your Zod schema using `schema.safeParse()`.
+4. **Error handling** — If arguments remain invalid after coercion, formatted validation errors are captured and returned cleanly without crashing your execution loop.
 
 ---
 
@@ -46,7 +44,7 @@ const provider = createOpenAIProvider({
 });
 const agent = new Agent(provider, [multiply]);
 
-// Model might send { a: "6", b: "7" } — kenpachi coerces and succeeds.
+// Model might send { a: "6", b: "7" } — kenpachi pre-coerces primitives and succeeds.
 const result = await agent.run("What is 6 times 7?");
 console.log(result.text);
 ```
@@ -55,7 +53,7 @@ console.log(result.text);
 
 ## Disable repair for a tool
 
-Set `repairable: false` when bad args should fail immediately (e.g. handoffs, security-sensitive tools):
+Set `repairable: false` when invalid argument attempts should fail immediately without retry attempts (e.g. handoffs, security-sensitive tools):
 
 ```typescript
 defineTool({
@@ -65,4 +63,4 @@ defineTool({
 });
 ```
 
-Configure max retries per run with `maxToolRepairAttempts` on `agent.run()`.
+Configure max retry attempts per run with `maxToolRepairAttempts` on `agent.run()`.

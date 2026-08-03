@@ -10,28 +10,30 @@ dependency) with a few things most minimal agent loops skip:
 
 - **Time-travel context** — every turn is snapshotted; branch and resume from
   any prior point without re-calling the model for turns you already ran.
-- **Self-healing tool calls** — malformed tool arguments are caught by Zod and
-  repaired/retried instead of crashing the run.
+- **Argument pre-coercion & validation** — primitive arguments (like numeric or boolean
+  strings) are automatically pre-coerced before Zod schema validation.
 - **Saga rollback** — register a compensating action per tool call; if a later
   step in the same batch fails, already-completed steps are undone in reverse.
 - **KenpachiSDK dynamic tool synthesis** — the model can author pure-logic tools
   (math, parsing, formatting) at runtime. Anything needing a credential goes
   through a `ConnectorRegistry` you configure ahead of time — the model writes
   the glue code, never the secret.
-- **Pluggable memory** — `InMemoryStore` by default, `Mem0MemoryStore` adapter
-  included.
+- **Pluggable memory** — `InMemoryStore` with tokenized keyword matching & synonym search,
+  plus `Mem0MemoryStore` adapter included.
+- **Multi-agent handoffs** — wrap specialist agents as tools with automatic
+  message ordering safeguards.
 
 ## Install
 
 ```bash
-npm install kenpachi-sdk
-
+npm install kenpachi
+```
 
 ## Quick start
 
 ```typescript
 import { z } from "zod";
-import { Agent, defineTool, createAnthropicProvider } from "kenpachi-sdk";
+import { Agent, defineTool, createAnthropicProvider } from "kenpachi";
 
 const getWeather = defineTool({
   name: "get_weather",
@@ -42,11 +44,14 @@ const getWeather = defineTool({
   },
 });
 
-const provider = createAnthropicProvider({ apiKey: process.env.ANTHROPIC_API_KEY! });
+const provider = createAnthropicProvider({
+  apiKey: process.env.ANTHROPIC_API_KEY!,
+  model: "claude-sonnet-4-6",
+});
 const agent = new Agent(provider, [getWeather]);
 
 const result = await agent.run("What's the weather in Nashik?");
-console.log(result.content);
+console.log(result.text);
 ```
 
 ## Time-travel
@@ -63,7 +68,7 @@ const branched = agent.context.branchAt(snap.turnIndex);
 ## Dynamic tools with a connector registry
 
 ```typescript
-import { ConnectorRegistry, synthesizeTool } from "kenpachi-sdk";
+import { ConnectorRegistry, synthesizeTool } from "kenpachi";
 
 const registry = new ConnectorRegistry();
 registry.register("weather", {
@@ -107,7 +112,7 @@ around `stream()` that returns the final `AgentRunResult`. Providers without
 ## Handoffs
 
 ```typescript
-import { handoff } from "kenpachi-sdk";
+import { handoff } from "kenpachi";
 
 const billingHandoff = handoff(billingAgent, "Use for billing or payment questions", {
   id: "billing", // tool name becomes handoff_billing

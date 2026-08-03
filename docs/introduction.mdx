@@ -16,7 +16,7 @@ description: "What kenpachi is and why teams use it to ship agent features faste
 | Feature | What it solves |
 | :--- | :--- |
 | **Typed tools** | Define tools once with Zod — the model gets a JSON schema, you get runtime validation. |
-| **Self-healing tool calls** | Bad arguments from the model are coerced or sent back as errors instead of crashing your app. |
+| **Argument pre-coercion** | Primitive argument types (like stringified numbers and booleans) are automatically coerced before schema validation keeps your agent loop resilient. |
 | **Time-travel context** | Snapshot every turn; branch or rewind without re-calling the model for history you already paid for. |
 | **Saga rollback** | Register undo handlers per tool — if a later step in the same batch fails, earlier steps are reversed. |
 | **Streaming** | Token-by-token output via `agent.stream()` or a one-line `onText` callback on `run()`. |
@@ -62,7 +62,7 @@ No boilerplate loop, no manual tool-call parsing — `agent.run()` handles the b
 
 Most teams building agents today either:
 
-1. **Roll their own loop** — fast to start, painful when you need undo, repair, streaming, or multi-agent routing.
+1. **Roll their own loop** — fast to start, painful when you need undo, argument coercion, streaming, or multi-agent routing.
 2. **Adopt a large framework** — powerful, but heavy and opinionated.
 
 kenpachi sits in the middle: **small surface area, production-shaped defaults**. You keep control of your stack (plain TypeScript, zero vendor SDK deps) while getting the guardrails that matter once you ship to real users.
